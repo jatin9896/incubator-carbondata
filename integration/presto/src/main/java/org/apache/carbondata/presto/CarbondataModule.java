@@ -64,7 +64,7 @@ public class CarbondataModule implements Module {
     configBinder(binder).bindConfig(CarbonTableConfig.class);
   }
 
-  public static final class TypeDeserializer extends FromStringDeserializer<Type> {
+  /*public static final class TypeDeserializer extends FromStringDeserializer<Type> {
     private final TypeManager typeManager;
 
     @Inject public TypeDeserializer(TypeManager typeManager) {
@@ -77,5 +77,5 @@ public class CarbondataModule implements Module {
       checkArgument(type != null, "Unknown type %s", value);
       return type;
     }
-  }
+  }*/
 }
