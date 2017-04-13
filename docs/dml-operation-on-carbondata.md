@@ -20,7 +20,7 @@
 # DML Operations on CarbonData
 This tutorial guides you through the data manipulation language support provided by CarbonData.
 
-## Overview 
+## Overview
 The following DML operations are supported in CarbonData :
 
 * [LOAD DATA](#load-data)
@@ -39,8 +39,8 @@ Please visit [Data Management](data-management.md) for more details on LOAD.
 ### Syntax
 
 ```
-LOAD DATA [LOCAL] INPATH 'folder_path' 
-INTO TABLE [db_name.]table_name 
+LOAD DATA [LOCAL] INPATH 'folder_path'
+INTO TABLE [db_name.]table_name
 OPTIONS(property_name=property_value, ...)
 ```
 
@@ -56,15 +56,15 @@ NOTE: The path shall be canonical path.
 | db_name       | Database name, if it is not specified then it uses the current database. | YES      |
 | table_name    | The name of the table in provided database.                          | NO       |
 | OPTIONS       | Extra options provided to Load                                       | YES      |
- 
+
 
 ### Usage Guidelines
 
 You can use the following options to load data:
 
 - **DELIMITER:** Delimiters can be provided in the load command.
-    
-    ``` 
+
+    ```
     OPTIONS('DELIMITER'=',')
     ```
 
@@ -83,31 +83,31 @@ You can use the following options to load data:
 - **FILEHEADER:** Headers can be provided in the LOAD DATA command if headers are missing in the source files.
 
     ```
-    OPTIONS('FILEHEADER'='column1,column2') 
+    OPTIONS('FILEHEADER'='column1,column2')
     ```
 
 - **MULTILINE:** CSV with new line character in quotes.
 
     ```
-    OPTIONS('MULTILINE'='true') 
+    OPTIONS('MULTILINE'='true')
     ```
 
 - **ESCAPECHAR:** Escape char can be provided if user want strict validation of escape character on CSV.
 
     ```
-    OPTIONS('ESCAPECHAR'='\') 
+    OPTIONS('ESCAPECHAR'='\')
     ```
 
 - **COMPLEX_DELIMITER_LEVEL_1:** Split the complex type data column in a row (eg., a$b$c --> Array = {a,b,c}).
 
     ```
-    OPTIONS('COMPLEX_DELIMITER_LEVEL_1'='$') 
+    OPTIONS('COMPLEX_DELIMITER_LEVEL_1'='$')
     ```
 
 - **COMPLEX_DELIMITER_LEVEL_2:** Split the complex type nested data column in a row. Applies level_1 delimiter & applies level_2 based on complex data type (eg., a:b$c:d --> Array> = {{a,b},{c,d}}).
 
     ```
-    OPTIONS('COMPLEX_DELIMITER_LEVEL_2'=':') 
+    OPTIONS('COMPLEX_DELIMITER_LEVEL_2'=':')
     ```
 
 - **ALL_DICTIONARY_PATH:** All dictionary files path.
@@ -124,7 +124,7 @@ You can use the following options to load data:
     ```
 
     NOTE: ALL_DICTIONARY_PATH and COLUMNDICT can't be used together.
-    
+
 - **DATEFORMAT:** Date format for specified column.
 
     ```
@@ -132,14 +132,6 @@ You can use the following options to load data:
     ```
 
     NOTE: Date formats are specified by date pattern strings. The date pattern letters in CarbonData are same as in JAVA. Refer to [SimpleDateFormat](http://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html).
-
-- **USE_KETTLE:** This option is used to specify whether to use kettle for loading data or not. By default kettle is not used for data loading.
-
-    ```
-    OPTIONS('USE_KETTLE'='FALSE')
-    ```
-
-   Note :  It is recommended to set the value for this option as false.
 
 - **SINGLE_PASS:** Single Pass Loading enables single job to finish data loading with dictionary generation on the fly. It enhances performance in the scenarios where the subsequent data loading after initial load involves fewer incremental updates on the dictionary.
 
@@ -165,7 +157,6 @@ options('DELIMITER'=',', 'QUOTECHAR'='"','COMMENTCHAR'='#',
 'MULTILINE'='true','ESCAPECHAR'='\','COMPLEX_DELIMITER_LEVEL_1'='$',
 'COMPLEX_DELIMITER_LEVEL_2'=':',
 'ALL_DICTIONARY_PATH'='/opt/alldictionary/data.dictionary',
-'USE_KETTLE'='FALSE',
 'SINGLE_PASS'='TRUE'
 )
 ```
@@ -180,14 +171,14 @@ This command inserts data into a CarbonData table. It is defined as a combinatio
 ### Syntax
 
 ```
-INSERT INTO TABLE <CARBONDATA TABLE> SELECT * FROM sourceTableName 
+INSERT INTO TABLE <CARBONDATA TABLE> SELECT * FROM sourceTableName
 [ WHERE { <filter_condition> } ];
 ```
 
 You can also omit the `table` keyword and write your query as:
- 
+
 ```
-INSERT INTO <CARBONDATA TABLE> SELECT * FROM sourceTableName 
+INSERT INTO <CARBONDATA TABLE> SELECT * FROM sourceTableName
 [ WHERE { <filter_condition> } ];
 ```
 
@@ -220,18 +211,18 @@ By default the above configuration will be false.
 
 ### Examples
 ```
-INSERT INTO table1 SELECT item1 ,sum(item2 + 1000) as result FROM 
+INSERT INTO table1 SELECT item1 ,sum(item2 + 1000) as result FROM
 table2 group by item1;
 ```
 
 ```
-INSERT INTO table1 SELECT item1, item2, item3 FROM table2 
+INSERT INTO table1 SELECT item1, item2, item3 FROM table2
 where item2='xyz';
 ```
 
 ```
-INSERT INTO table1 SELECT * FROM table2 
-where exists (select * from table3 
+INSERT INTO table1 SELECT * FROM table2
+where exists (select * from table3
 where table2.item1 = table3.item1);
 ```
 
@@ -242,7 +233,7 @@ where table2.item1 = table3.item1);
 This command is used to get the segments of CarbonData table.
 
 ```
-SHOW SEGMENTS FOR TABLE [db_name.]table_name 
+SHOW SEGMENTS FOR TABLE [db_name.]table_name
 LIMIT number_of_segments;
 ```
 
@@ -262,7 +253,7 @@ SHOW SEGMENTS FOR TABLE CarbonDatabase.CarbonTable LIMIT 4;
 
 ## DELETE SEGMENT BY ID
 
-This command is used to delete segment by using the segment ID. Each segment has a unique segment ID associated with it. 
+This command is used to delete segment by using the segment ID. Each segment has a unique segment ID associated with it.
 Using this segment ID, you can remove the segment.
 
 The following command will get the segmentID.
@@ -274,7 +265,7 @@ SHOW SEGMENTS FOR Table dbname.tablename LIMIT number_of_segments
 After you retrieve the segment ID of the segment that you want to delete, execute the following command to delete the selected segment.
 
 ```
-DELETE SEGMENT segment_sequence_id1, segments_sequence_id2, .... 
+DELETE SEGMENT segment_sequence_id1, segments_sequence_id2, ....
 FROM TABLE tableName
 ```
 
@@ -291,15 +282,15 @@ FROM TABLE tableName
 DELETE SEGMENT 0 FROM TABLE CarbonDatabase.CarbonTable;
 DELETE SEGMENT 0.1,5,8 FROM TABLE CarbonDatabase.CarbonTable;
 ```
-  NOTE: Here 0.1 is compacted segment sequence id. 
+  NOTE: Here 0.1 is compacted segment sequence id.
 
 ## DELETE SEGMENT BY DATE
 
-This command will allow to delete the CarbonData segment(s) from the store based on the date provided by the user in the DML command. 
+This command will allow to delete the CarbonData segment(s) from the store based on the date provided by the user in the DML command.
 The segment created before the particular date will be removed from the specific stores.
 
 ```
-DELETE FROM TABLE [schema_name.]table_name 
+DELETE FROM TABLE [schema_name.]table_name
 WHERE[DATE_FIELD]BEFORE [DATE_VALUE]
 ```
 
@@ -314,8 +305,8 @@ WHERE[DATE_FIELD]BEFORE [DATE_VALUE]
 ### Example:
 
 ```
- DELETE SEGMENTS FROM TABLE CarbonDatabase.CarbonTable 
- WHERE STARTTIME BEFORE '2017-06-01 12:05:06';  
+ DELETE SEGMENTS FROM TABLE CarbonDatabase.CarbonTable
+ WHERE STARTTIME BEFORE '2017-06-01 12:05:06';
 ```
 
 ## Update CarbonData Table
@@ -364,9 +355,9 @@ The following conditions must be met for successful updation :
 
 ```
  UPDATE t_carbn01 a
- SET (a.item_type_code, a.profit) = ( SELECT b.item_type_cd,
+ SET (a.item_type_code, a.profit) = (SELECT b.item_type_cd,
  sum(b.profit) from t_carbn01b b
- WHERE item_type_cd =2 group by item_type_code);
+ WHERE item_type_cd = 2 group by item_type_code);
 ```
 
 Here the Update Operation fails as the query contains aggregate function sum(b.profit) and group by clause in the sub-query.
@@ -376,14 +367,14 @@ Here the Update Operation fails as the query contains aggregate function sum(b.p
 UPDATE carbonTable1 d
 SET(d.column3,d.column5 ) = (SELECT s.c33 ,s.c55
 FROM sourceTable1 s WHERE d.column1 = s.c11)
-WHERE d.column1 = 'china' EXISTS( SELECT * from table3 o where o.c2 > 1);
+WHERE d.column1 = 'china' EXISTS(SELECT * from table3 o where o.c2 > 1);
 ```
 
 
 ```
 UPDATE carbonTable1 d SET (c3) = (SELECT s.c33 from sourceTable1 s
 WHERE d.column1 = s.c11)
-WHERE exists( select * from iud.other o where o.c2 > 1);
+WHERE exists(SELECT * from iud.other o where o.c2 > 1);
 ```
 
 

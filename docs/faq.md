@@ -73,5 +73,3 @@ The property carbon.lock.type configuration specifies the type of lock to be acq
 
 ## How to resolve Abstract Method Error?
 In order to build CarbonData project it is necessary to specify the spark profile. The spark profile sets the Spark Version. You need to specify the ``spark version`` while using Maven to build project.
-
-
