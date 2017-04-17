@@ -129,7 +129,8 @@ To get started with CarbonData : [Quick Start](quick-start-guide.md), [DDL Opera
      ./bin/spark-shell --master yarn-client --driver-memory 1g
      --executor-cores 2 --executor-memory 2G
    ```
-  **NOTE**: Make sure you have permissions for CarbonData JARs and files through which driver and executor will start.
+
+**NOTE**: Make sure you have permissions for CarbonData JARs and files through which driver and executor will start.
 
   Getting started with CarbonData : [Quick Start](quick-start-guide.md), [DDL Operations on CarbonData](ddl-operation-on-carbondata.md)
 
