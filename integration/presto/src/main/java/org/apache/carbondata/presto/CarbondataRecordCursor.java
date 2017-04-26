@@ -22,14 +22,12 @@ import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Decimals;
 import com.facebook.presto.spi.type.TimestampType;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.spi.block.Block;
-import com.facebook.presto.spi.block.BlockBuilder;
-import com.facebook.presto.spi.block.BlockBuilderStatus;
 
+import com.facebook.presto.type.ArrayType;
 import com.google.common.base.Strings;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
-import io.airlift.slice.Slices;
+
 import org.apache.carbondata.common.CarbonIterator;
 import org.apache.carbondata.hadoop.readsupport.CarbonReadSupport;
 
@@ -49,6 +47,7 @@ import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.Slices.utf8Slice;
+import static io.airlift.slice.Slices.wrappedIntArray;
 
 public class CarbondataRecordCursor implements RecordCursor {
 
@@ -103,11 +102,9 @@ public class CarbondataRecordCursor implements RecordCursor {
     if (rowCursor.hasNext()) {
       Object[] columns = readSupport.readRow(rowCursor.next());
       fields = new ArrayList<String>();
-      if(columns != null && columns.length > 0)
-      {
-        for(Object value : columns){
-          if(value != null )
-          {
+      if (columns != null && columns.length > 0) {
+        for (Object value : columns) {
+          if (value != null) {
             fields.add(value.toString());
           } else {
             fields.add(null);
@@ -128,8 +125,8 @@ public class CarbondataRecordCursor implements RecordCursor {
   @Override public long getLong(int field) {
     String timeStr = getFieldValue(field);
     Type actual = getType(field);
-    if(actual instanceof TimestampType){
-      return new Timestamp(Long.parseLong(timeStr)).getTime()/1000;
+    if (actual instanceof TimestampType) {
+      return new Timestamp(Long.parseLong(timeStr)).getTime() / 1000;
     }
     //suppose the
     return Math.round(Double.parseDouble(getFieldValue(field)));
@@ -141,18 +138,19 @@ public class CarbondataRecordCursor implements RecordCursor {
   }
 
   @Override public Slice getSlice(int field) {
-    Type decimalType = getType(field);
-    if (decimalType instanceof DecimalType) {
-      DecimalType actual = (DecimalType) decimalType;
+    Type type = getType(field);
+    if (type instanceof DecimalType) {
+      DecimalType actual = (DecimalType) type;
       CarbondataColumnHandle carbondataColumnHandle = columnHandles.get(field);
-      if(carbondataColumnHandle.getPrecision() > 0 ) {
-        checkFieldType(field, DecimalType.createDecimalType(carbondataColumnHandle.getPrecision(), carbondataColumnHandle.getScale()));
+      if (carbondataColumnHandle.getPrecision() > 0) {
+        checkFieldType(field, DecimalType.createDecimalType(carbondataColumnHandle.getPrecision(),
+            carbondataColumnHandle.getScale()));
       } else {
         checkFieldType(field, DecimalType.createDecimalType());
       }
       String fieldValue = getFieldValue(field);
       BigDecimal bigDecimalValue = new BigDecimal(fieldValue);
-      if (isShortDecimal(decimalType)) {
+      if (isShortDecimal(type)) {
         return utf8Slice(Decimals.toString(bigDecimalValue.longValue(), actual.getScale()));
       } else {
         if (bigDecimalValue.scale() > actual.getScale()) {
@@ -172,15 +170,79 @@ public class CarbondataRecordCursor implements RecordCursor {
         }
 
       }
+    }
+    //TODO: Remove this with instanceOf operator
+    else if (type.getClass().getName() == ArrayType.class.getName()) {
+      // ArrayType actual = (ArrayType) type;
+      //checkFieldType(field, new ArrayType(actual.getElementType()));
+      String fieldValue = getFieldValue(field);
+      return wrappedIntArray(getArrayData(field));
+/*utf8Slice(getFieldValue(field));*/
     } else {
       checkFieldType(field, VARCHAR);
       return utf8Slice(getFieldValue(field));
     }
   }
 
-  @Override public Object getObject(int field) {
-    return null;
+  public int[] getArrayData(int field) {
+    // Type elementType = type.getElementType();
+    String fieldValue = getFieldValue(field);
+    String[] data = fieldValue.replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("\\s", "").split(",");
+    int[] results = new int[data.length];
+
+    for (int i = 0; i < results.length; i++) {
+      results[i] = Integer.parseInt(data[i]);
+    }
+    return results;
   }
+
+  @Override public Object getObject(int field) {
+    Object arrValues = getData(field);
+    return arrValues;
+  }
+
+  private Object getData(int field) {
+    String fieldValue = getFieldValue(field);
+    String[] data = fieldValue.replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("\\s", "").split(",");
+    String arrDataType = columnHandles.get(field).getColumnType().getDisplayName();
+    if (arrDataType.contains("boolean")) {
+      Boolean[] results = new Boolean[data.length];
+      for (int i = 0; i < results.length; i++) {
+        results[i] = Boolean.parseBoolean(data[i]);
+      }
+      return results;
+    }
+   else if(arrDataType.contains("long")) {
+      Long[] results = new Long[data.length];
+
+      for (int i = 0; i < results.length; i++) {
+        results[i] = Long.parseLong(data[i]);
+      }
+      return results;
+  } else if(arrDataType.contains("double")) {
+      Double[] results = new Double[data.length];
+
+      for (int i = 0; i < results.length; i++) {
+        results[i] = Double.parseDouble(data[i]);
+      }
+      return results;
+  } else if(arrDataType.contains("integer")) {
+      Integer[] results = new Integer[data.length];
+
+      for (int i = 0; i < results.length; i++) {
+        results[i] = Integer.parseInt(data[i]);
+      }
+      return results;
+  } else if(arrDataType.contains("float")) {
+      Float[] results = new Float[data.length];
+
+      for (int i = 0; i < results.length; i++) {
+        results[i] = Float.parseFloat(data[i]);
+      }
+      return results;
+    }
+ return null;
+}
 
   @Override public boolean isNull(int field) {
     checkArgument(field < columnHandles.size(), "Invalid field index");

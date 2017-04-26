@@ -20,14 +20,19 @@ package org.apache.carbondata.presto;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.RecordSet;
+import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.block.IntArrayBlock;
+import com.facebook.presto.spi.block.LongArrayBlock;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.slice.Slice;
@@ -52,20 +57,17 @@ public class CarbondataPageSource implements ConnectorPageSource {
   private boolean closed;
   private final char[] buffer = new char[100];
 
-  public CarbondataPageSource(RecordSet recordSet)
-  {
+  public CarbondataPageSource(RecordSet recordSet) {
     this(requireNonNull(recordSet, "recordSet is null").getColumnTypes(), recordSet.cursor());
   }
 
-  public CarbondataPageSource(List<Type> types, RecordCursor cursor)
-  {
+  public CarbondataPageSource(List<Type> types, RecordCursor cursor) {
     this.cursor = requireNonNull(cursor, "cursor is null");
     this.types = unmodifiableList(new ArrayList<>(requireNonNull(types, "types is null")));
     this.pageBuilder = new PageBuilder(this.types);
   }
 
-  public RecordCursor getCursor()
-  {
+  public RecordCursor getCursor() {
     return cursor;
   }
 
@@ -111,10 +113,24 @@ public class CarbondataPageSource implements ConnectorPageSource {
               type.writeLong(output, cursor.getLong(column));
             } else if (javaType == double.class) {
               type.writeDouble(output, cursor.getDouble(column));
+            } else if (javaType == Block.class) {
+
+              //Slice slice = cursor.getSlice(column);
+              //              type.writeObject(output, cursor.getObject(column));
+              /*output.getPositionCount();
+              output.getSizeInBytes();*/
+
+              Object val = cursor.getObject(column);
+              writeObject(val, output, type);
+              //type.writeObject(output, new IntArrayBlock(output.getPositionCount(), boolArr, data));
+
+              //              type.writeObject(output, output.build());
+
+              // type.writeSlice(output, slice, 0, slice.length());
+
             } else if (javaType == Slice.class) {
               Slice slice = cursor.getSlice(column);
-              if(type instanceof  DecimalType)
-              {
+              if (type instanceof DecimalType) {
                 if (isShortDecimal(type)) {
                   type.writeLong(output, parseLong((DecimalType) type, slice, 0, slice.length()));
                 } else {
@@ -138,7 +154,34 @@ public class CarbondataPageSource implements ConnectorPageSource {
     Page page = pageBuilder.build();
     pageBuilder.reset();
     return page;
- }
+  }
+
+  private void writeObject(Object val, BlockBuilder output, Type type) {
+    Class arrTypeClass = val.getClass().getComponentType();
+    boolean[] isNull = checkNull(val);
+    if (arrTypeClass == Integer.class) {
+      int[] intArray = Arrays.stream((Integer[])val).mapToInt(Integer::intValue).toArray();
+      type.writeObject(output, new IntArrayBlock(output.getPositionCount(), isNull, (intArray)));
+    } else if (arrTypeClass == Long.class) {
+      type.writeObject(output, new LongArrayBlock(output.getPositionCount(), isNull, (long[]) val));
+    } else {
+    }
+  }
+
+  private boolean[] checkNull(Object val) {
+   //TODO: cast in a generic type
+    Integer[] arrData = (Integer[]) val;
+    boolean[] isNull = new boolean[arrData.length];
+    int i;
+    for (i = 0; i < arrData.length; i++) {
+      if (Objects.isNull(arrData[i])) {
+        isNull[i] = true;
+      } else {
+        isNull[i] = false;
+      }
+    }
+    return isNull;
+  }
 
   @Override public long getSystemMemoryUsage() {
     return cursor.getSystemMemoryUsage() + pageBuilder.getSizeInBytes();
@@ -147,32 +190,29 @@ public class CarbondataPageSource implements ConnectorPageSource {
   @Override public void close() throws IOException {
     closed = true;
     cursor.close();
-
   }
 
-  private long parseLong(DecimalType type, Slice slice, int offset, int length)
-  {
+  private long parseLong(DecimalType type, Slice slice, int offset, int length) {
     BigDecimal decimal = parseBigDecimal(type, slice, offset, length);
     return decimal.unscaledValue().longValue();
   }
 
-
-  private Slice parseSlice(DecimalType type, Slice slice, int offset, int length)
-  {
+  private Slice parseSlice(DecimalType type, Slice slice, int offset, int length) {
     BigDecimal decimal = parseBigDecimal(type, slice, offset, length);
     return encodeUnscaledValue(decimal.unscaledValue());
   }
 
-  private BigDecimal parseBigDecimal(DecimalType type, Slice slice, int offset, int length)
-  {
+  private BigDecimal parseBigDecimal(DecimalType type, Slice slice, int offset, int length) {
     checkArgument(length < buffer.length);
     for (int i = 0; i < length; i++) {
       buffer[i] = (char) slice.getByte(offset + i);
     }
     BigDecimal decimal = new BigDecimal(buffer, 0, length);
-    checkState(decimal.scale() <= type.getScale(), "Read decimal value scale larger than column scale");
+    checkState(decimal.scale() <= type.getScale(),
+        "Read decimal value scale larger than column scale");
     decimal = decimal.setScale(type.getScale(), HALF_UP);
-    checkState(decimal.precision() <= type.getPrecision(), "Read decimal precision larger than column precision");
+    checkState(decimal.precision() <= type.getPrecision(),
+        "Read decimal precision larger than column precision");
     return decimal;
   }
 }

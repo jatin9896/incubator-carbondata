@@ -58,6 +58,7 @@ import com.facebook.presto.spi.type.TimestampType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeSignatureParameter;
 import com.facebook.presto.spi.type.VarcharType;
+import com.facebook.presto.type.ArrayType;
 import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -152,20 +153,35 @@ public class CarbondataMetadata implements ConnectorMetadata {
     List<CarbonColumn> carbonColumns =
         carbonTable.getCreateOrderColumn(schemaTableName.getTableName());
     Type columnType;
+
     List<CarbonDimension> carbonDimensions = carbonTable.getAllDimensions();
+    for(CarbonColumn carbonColumn : carbonColumns) {
+      if(carbonColumn.isComplex()) {
+        CarbonDimension carbonDimension = (CarbonDimension) carbonColumn;
+        columnType = CarbondataType2SpiMapperForComplex(carbonDimension);
+        ColumnMetadata columnMeta =
+            new ColumnMetadata(carbonDimension.getColumnSchema().getColumnName(), columnType);
+        columnsMetaList.add(columnMeta);
+      } else {
+        columnType = CarbondataType2SpiMapper(carbonColumn.getColumnSchema());
+        ColumnMetadata columnMeta =
+            new ColumnMetadata(carbonColumn.getColumnSchema().getColumnName(), columnType);
+        columnsMetaList.add(columnMeta);
+      }
+    /*}
     for(CarbonDimension carbonDimension: carbonDimensions) {
       if(carbonDimension.isComplex()) {
         columnType = CarbondataType2SpiMapperForComplex(carbonDimension);
-        /*ColumnMetadata columnMetaComplex =
+        *//*ColumnMetadata columnMetaComplex =
             new ColumnMetadata(carbonDimension.getColumnSchema().getColumnName(), columnType);
-        columnsMetaList.add(columnMetaComplex);*/
+        columnsMetaList.add(columnMetaComplex);*//*
       }
       else {
         columnType = CarbondataType2SpiMapper(carbonDimension.getColumnSchema());
       }
       ColumnMetadata columnMeta =
           new ColumnMetadata(carbonDimension.getColumnSchema().getColumnName(), columnType);
-      columnsMetaList.add(columnMeta);
+      columnsMetaList.add(columnMeta);*/
     }
     /*List<CarbonMeasure> carbonMeasures = carbonTable.getAllMeasures();
     for (CarbonMeasure carbonMeasure : carbonMeasures) {
@@ -228,7 +244,7 @@ public class CarbondataMetadata implements ConnectorMetadata {
       if (column.isComplex()) {
         spiType = CarbondataType2SpiMapperForComplex(column);
         columnHandles.put(column.getColumnSchema().getColumnName(),
-            new CarbondataColumnHandle(connectorId, column.getColumnSchema().getColumnName(), spiType,
+            new CarbondataColumnHandle(connectorId, column/*.getListOfChildDimensions().get(0)*/.getColumnSchema().getColumnName(), spiType,
                 column.getSchemaOrdinal(), column.getKeyOrdinal(), column.getColumnGroupOrdinal(),
                 false, column.getListOfChildDimensions().get(0).getColumnSchema().getColumnGroupId(), column.getListOfChildDimensions().get(0).getColumnSchema().getColumnUniqueId(), cs.isUseInvertedIndex(),
                 column.getListOfChildDimensions().get(0).getColumnSchema().getPrecision(), column.getListOfChildDimensions().get(0).getColumnSchema().getScale()));
@@ -315,12 +331,9 @@ public class CarbondataMetadata implements ConnectorMetadata {
   public static Type CarbondataType2SpiMapperForComplex(CarbonDimension carbonDimension) {
     ColumnSchema columnSchema = carbonDimension.getColumnSchema();
     DataType colType = columnSchema.getDataType();
-    TypeRegistry TYPE_MANAGER = new TypeRegistry();
     if (colType == ARRAY) {
-      return TYPE_MANAGER.getParameterizedType(com.facebook.presto.spi.type.StandardTypes.ARRAY, ImmutableList.of(TypeSignatureParameter
-          .of(CarbondataType2SpiMapper(
-              carbonDimension.getListOfChildDimensions().get(0).getColumnSchema())
-              .getTypeSignature())));
+      return new ArrayType(CarbondataType2SpiMapper(
+          carbonDimension.getListOfChildDimensions().get(0).getColumnSchema()));
     }
     return CarbondataType2SpiMapper(columnSchema);
   }
@@ -353,7 +366,6 @@ public class CarbondataMetadata implements ConnectorMetadata {
         return DateType.DATE;
       case TIMESTAMP:
         return TimestampType.TIMESTAMP;
-      //  case ARRAY: TYPE_MANAGER.getParameterizedType(ARRAY, ImmutableList.of(TypeSignatureParameter.of(createUnboundedVarcharType().getTypeSignature())));
       default:
         return VarcharType.VARCHAR;
     }
