@@ -33,6 +33,7 @@ import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.IntArrayBlock;
 import com.facebook.presto.spi.block.LongArrayBlock;
+import com.facebook.presto.spi.block.SliceArrayBlock;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.slice.Slice;
@@ -41,6 +42,7 @@ import static com.facebook.presto.spi.type.Decimals.encodeUnscaledValue;
 import static com.facebook.presto.spi.type.Decimals.isShortDecimal;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static io.airlift.slice.Slices.utf8Slice;
 import static java.math.RoundingMode.HALF_UP;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
@@ -114,20 +116,8 @@ public class CarbondataPageSource implements ConnectorPageSource {
             } else if (javaType == double.class) {
               type.writeDouble(output, cursor.getDouble(column));
             } else if (javaType == Block.class) {
-
-              //Slice slice = cursor.getSlice(column);
-              //              type.writeObject(output, cursor.getObject(column));
-              /*output.getPositionCount();
-              output.getSizeInBytes();*/
-
               Object val = cursor.getObject(column);
-              writeObject(val, output, type);
-              //type.writeObject(output, new IntArrayBlock(output.getPositionCount(), boolArr, data));
-
-              //              type.writeObject(output, output.build());
-
-              // type.writeSlice(output, slice, 0, slice.length());
-
+              writeObject(val, output, type, column);
             } else if (javaType == Slice.class) {
               Slice slice = cursor.getSlice(column);
               if (type instanceof DecimalType) {
@@ -156,21 +146,33 @@ public class CarbondataPageSource implements ConnectorPageSource {
     return page;
   }
 
-  private void writeObject(Object val, BlockBuilder output, Type type) {
+  private void writeObject(Object val, BlockBuilder output, Type type, int column) {
     Class arrTypeClass = val.getClass().getComponentType();
     boolean[] isNull = checkNull(val);
     if (arrTypeClass == Integer.class) {
-      int[] intArray = Arrays.stream((Integer[])val).mapToInt(Integer::intValue).toArray();
-      type.writeObject(output, new IntArrayBlock(output.getPositionCount(), isNull, (intArray)));
+      int[] intArray = Arrays.stream((Integer[]) val).mapToInt(Integer::intValue).toArray();
+      type.writeObject(output, new IntArrayBlock(intArray.length, isNull, intArray));
     } else if (arrTypeClass == Long.class) {
-      type.writeObject(output, new LongArrayBlock(output.getPositionCount(), isNull, (long[]) val));
-    } else {
+      long[] longArray = Arrays.stream((Long[]) val).mapToLong(Long::longValue).toArray();
+      type.writeObject(output, new LongArrayBlock(longArray.length, isNull, longArray));
+    } else if (arrTypeClass == String.class) {
+      Slice[] stringSlices = getStringSlices(val);
+      type.writeObject(output, new SliceArrayBlock(stringSlices.length, stringSlices));
     }
   }
 
+  private Slice[] getStringSlices(Object val) {
+    String[] data = (String[]) val;
+    Slice[] stringSlices = new Slice[data.length];
+    for (int i = 0; i < data.length; i++) {
+      stringSlices[i] = utf8Slice(data[i]);
+    }
+    return stringSlices;
+  }
+
   private boolean[] checkNull(Object val) {
-   //TODO: cast in a generic type
-    Integer[] arrData = (Integer[]) val;
+    //TODO: cast in a generic type
+    Object[] arrData = (Object[]) val;
     boolean[] isNull = new boolean[arrData.length];
     int i;
     for (i = 0; i < arrData.length; i++) {
