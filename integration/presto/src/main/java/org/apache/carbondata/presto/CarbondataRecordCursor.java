@@ -188,7 +188,7 @@ public class CarbondataRecordCursor implements RecordCursor {
         results[i] = Boolean.parseBoolean(data[i]);
       }
       return results;
-    } else if (arrDataType.contains("long")) {
+    } else if (arrDataType.contains("long") || arrDataType.contains("bigint")) {
       Long[] results = new Long[data.length];
 
       for (int i = 0; i < results.length; i++) {
