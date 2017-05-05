@@ -37,18 +37,13 @@ import com.facebook.presto.spi.block.LongArrayBlock;
 import com.facebook.presto.spi.block.SliceArrayBlock;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Decimals;
-import com.facebook.presto.spi.type.DoubleType;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.spi.type.VarcharType;
 import com.facebook.presto.type.ArrayType;
 import io.airlift.slice.Slice;
-import org.apache.spark.sql.types.Decimal;
 
 import static com.facebook.presto.spi.type.Decimals.encodeUnscaledValue;
 import static com.facebook.presto.spi.type.Decimals.isShortDecimal;
 import static com.facebook.presto.spi.type.Decimals.rescale;
-import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
-import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.Slices.utf8Slice;
@@ -157,8 +152,7 @@ public class CarbondataPageSource implements ConnectorPageSource {
 
   private void writeObject(Object val, BlockBuilder output, Type type) {
     Class arrTypeClass = val.getClass().getComponentType();
-    /*ArrayType arrType = (ArrayType)type;
-    Type elemType = arrType.getElementType();*/
+
     boolean[] isNull = checkNull(val);
     if (arrTypeClass == Integer.class/*elemType instanceof IntegerType*/) {
       int[] intArray = Arrays.stream((Integer[]) val).mapToInt(Integer::intValue).toArray();
@@ -166,39 +160,31 @@ public class CarbondataPageSource implements ConnectorPageSource {
     } else if (arrTypeClass == Long.class/*elemType instanceof BigintType*/) {
       long[] longArray = Arrays.stream((Long[]) val).mapToLong(Long::longValue).toArray();
       type.writeObject(output, new LongArrayBlock(longArray.length, isNull, longArray));
-    } else if ((arrTypeClass == String.class) && (type.getDisplayName().contains("string"))/*elemType instanceof VarcharType*/) {
+    } else if ((arrTypeClass == String.class) && (type.getDisplayName()
+        .contains("varchar"))/*elemType instanceof VarcharType*/) {
       Slice[] stringSlices = getStringSlices(val);
       type.writeObject(output, new SliceArrayBlock(stringSlices.length, stringSlices));
-    } else if (arrTypeClass == Double.class || arrTypeClass == Float.class/*elemType instanceof DoubleType*/) {
-
-
-      /*Slice[] floatSlices = getFloatSlices(val);
-      type.writeObject(output, new SliceArrayBlock(floatSlices.length, floatSlices));
-    } else if(arrTypeClass == Double.class) {*/
-
-     // DoubleType doubleType = (DoubleType)((ArrayType) type).getElementType();
-
-
-      Slice[] doubleSlices = getDoubleSlices(val);
+    } else if (arrTypeClass == Double.class
+        || arrTypeClass == Float.class/*elemType instanceof DoubleType*/) {
       Double[] data = (Double[]) val;
-
-      /*ArrayType arrayType = getArrayType(DOUBLE);
-      for(int i=0;i <data.length; i++) {
-        arrayType.getElementType().writeDouble(output, data[i]);
-      }*/
-
-      type.writeObject(output, new SliceArrayBlock(doubleSlices.length, doubleSlices));
-
-
+      long[] doubleLongData = getLongDataForDouble(data);
+      type.writeObject(output, new LongArrayBlock(doubleLongData.length, isNull, doubleLongData));
     } else if (arrTypeClass == Boolean.class/*elemType instanceof BooleanType*/) {
       Slice[] booleanSlices = getBooleanSlices(val);
       type.writeObject(output, new SliceArrayBlock(booleanSlices.length, booleanSlices));
-    } else /*if (elemType instanceof DecimalType) */{
-
-      Slice[] decimalSlices = getDecimalSlices(val, type);
+    } else /*if (elemType instanceof DecimalType) */ {
+      Slice[] decimalSlices = getDecimalSlices(val, DecimalType.createDecimalType());
       Slice[] parsedSlices = getParsedSlicesForDecimal(decimalSlices, type);
       type.writeObject(output, new SliceArrayBlock(parsedSlices.length, parsedSlices));
     }
+  }
+
+  private long[] getLongDataForDouble(Double[] doubleData) {
+    long[] data = new long[doubleData.length];
+    for (int i = 0; i < doubleData.length; i++) {
+      data[i] = Double.doubleToLongBits(doubleData[i]);
+    }
+    return data;
   }
 
   private ArrayType getArrayType(Type type) {
@@ -209,44 +195,38 @@ public class CarbondataPageSource implements ConnectorPageSource {
     /*ArrayType arrType = ((ArrayType) type);
         Type elemType = arrType.getElementType() ;*/
     Slice[] parsedSlices = new Slice[slices.length];
-    for(int i=0;i < slices.length ; i ++) {
-      parsedSlices[i] = parseSlice(DecimalType.createDecimalType()/*(DecimalType) elemType*/, slices[i], 0, slices[i].length());
+    for (int i = 0; i < slices.length; i++) {
+      parsedSlices[i] =
+          parseSlice(DecimalType.createDecimalType()/*(DecimalType) elemType*/, slices[i], 0,
+              slices[i].length());
     }
     return parsedSlices;
   }
 
   private Slice[] getDecimalSlices(Object val, Type type) {
-    String[] data = (String[]) val;
-   /* if(type instanceof ArrayType) {
-      ArrayType arrayType = (ArrayType) type;
-
-    DecimalType decType = (DecimalType)arrayType.getElementType();*/
+    BigDecimal[] data = (BigDecimal[]) val;
     DecimalType decType = DecimalType.createDecimalType();
     Slice[] decimalSlices = new Slice[data.length];
     for (int i = 0; i < data.length; i++) {
-      BigDecimal bigDecimalValue = new BigDecimal(data[i]);
       if (isShortDecimal(type)) {
-        decimalSlices[i] = utf8Slice(Decimals.toString(bigDecimalValue.longValue(), decType.getScale()));
+        decimalSlices[i] = utf8Slice(Decimals.toString(data[i].longValue(), decType.getScale()));
       } else {
 
-        if (bigDecimalValue.scale() > decType.getScale()) {
+        if (data[i].scale() > decType.getScale()) {
           BigInteger unscaledDecimal =
-              rescale(bigDecimalValue.unscaledValue(), bigDecimalValue.scale(), bigDecimalValue.scale());
+              rescale(data[i].unscaledValue(), data[i].scale(), data[i].scale());
           Slice decSlice = Decimals.encodeUnscaledValue(unscaledDecimal);
           decimalSlices[i] = utf8Slice(Decimals.toString(decSlice, decType.getScale()));
         } else {
           BigInteger unscaledDecimal =
-              rescale(bigDecimalValue.unscaledValue(), bigDecimalValue.scale(), decType.getScale());
+              rescale(data[i].unscaledValue(), data[i].scale(), decType.getScale());
           Slice decSlice = Decimals.encodeUnscaledValue(unscaledDecimal);
           decimalSlices[i] = utf8Slice(Decimals.toString(decSlice, decType.getScale()));
         }
       }
     }
     return decimalSlices;
-  } /*else {
-    return null;
-    }
-  }*/
+  }
 
   private Slice[] getBooleanSlices(Object val) {
     Boolean[] data = (Boolean[]) val;
@@ -255,24 +235,6 @@ public class CarbondataPageSource implements ConnectorPageSource {
       booleanSlices[i] = utf8Slice(Boolean.toString(data[i]));
     }
     return booleanSlices;
-  }
-
-  private Slice[] getDoubleSlices(Object val) {
-    Double[] data = (Double[]) val;
-    Slice[] doubleSlices = new Slice[data.length];
-    for (int i = 0; i < data.length; i++) {
-      doubleSlices[i] = utf8Slice(Double.toString(data[i]));
-    }
-    return doubleSlices;
-  }
-
-  private Slice[] getFloatSlices(Object val) {
-    Float[] data = (Float[]) val;
-    Slice[] floatSlices = new Slice[data.length];
-    for (int i = 0; i < data.length; i++) {
-      floatSlices[i] = utf8Slice(Float.toString(data[i]));
-    }
-    return floatSlices;
   }
 
   private Slice[] getStringSlices(Object val) {

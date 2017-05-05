@@ -215,6 +215,12 @@ public class CarbondataRecordCursor implements RecordCursor {
         results[i] = Float.parseFloat(data[i]);
       }
       return results;
+    } else if(arrDataType.contains("decimal")) {
+      BigDecimal[] results = new BigDecimal[data.length];
+      for( int i=0;i <data.length; i++) {
+        results[i] = new BigDecimal(data[i]);
+      }
+      return results;
     }
     return data;
   }
