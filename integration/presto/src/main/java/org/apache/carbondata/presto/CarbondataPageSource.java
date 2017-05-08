@@ -38,7 +38,6 @@ import com.facebook.presto.spi.block.SliceArrayBlock;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Decimals;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.type.ArrayType;
 import io.airlift.slice.Slice;
 
 import static com.facebook.presto.spi.type.Decimals.encodeUnscaledValue;
@@ -154,28 +153,29 @@ public class CarbondataPageSource implements ConnectorPageSource {
     Class arrTypeClass = val.getClass().getComponentType();
 
     boolean[] isNull = checkNull(val);
-    if (arrTypeClass == Integer.class/*elemType instanceof IntegerType*/) {
+    if (arrTypeClass == Integer.class) {
       int[] intArray = Arrays.stream((Integer[]) val).mapToInt(Integer::intValue).toArray();
       type.writeObject(output, new IntArrayBlock(intArray.length, isNull, intArray));
-    } else if (arrTypeClass == Long.class/*elemType instanceof BigintType*/) {
+    } else if (arrTypeClass == Long.class) {
       long[] longArray = Arrays.stream((Long[]) val).mapToLong(Long::longValue).toArray();
       type.writeObject(output, new LongArrayBlock(longArray.length, isNull, longArray));
-    } else if ((arrTypeClass == String.class) && (type.getDisplayName()
-        .contains("varchar"))/*elemType instanceof VarcharType*/) {
+    } else if ((arrTypeClass == String.class) && (type.getDisplayName().contains("varchar"))) {
       Slice[] stringSlices = getStringSlices(val);
       type.writeObject(output, new SliceArrayBlock(stringSlices.length, stringSlices));
-    } else if (arrTypeClass == Double.class
-        || arrTypeClass == Float.class/*elemType instanceof DoubleType*/) {
+    } else if (arrTypeClass == Double.class || arrTypeClass == Float.class) {
       Double[] data = (Double[]) val;
       long[] doubleLongData = getLongDataForDouble(data);
       type.writeObject(output, new LongArrayBlock(doubleLongData.length, isNull, doubleLongData));
-    } else if (arrTypeClass == Boolean.class/*elemType instanceof BooleanType*/) {
+    } else if (arrTypeClass == Boolean.class) {
       Slice[] booleanSlices = getBooleanSlices(val);
       type.writeObject(output, new SliceArrayBlock(booleanSlices.length, booleanSlices));
     } else /*if (elemType instanceof DecimalType) */ {
-      Slice[] decimalSlices = getDecimalSlices(val, DecimalType.createDecimalType());
+      DecimalType decimalType = DecimalType.createDecimalType();
+      Slice[] decimalSlices = getDecimalSlices(val, decimalType);
       Slice[] parsedSlices = getParsedSlicesForDecimal(decimalSlices, type);
-      type.writeObject(output, new SliceArrayBlock(parsedSlices.length, parsedSlices));
+      long[] longDecimalValues = getDecimalLongData(val);
+      type.writeObject(output,
+          new LongArrayBlock(longDecimalValues.length, isNull, longDecimalValues));
     }
   }
 
@@ -187,18 +187,20 @@ public class CarbondataPageSource implements ConnectorPageSource {
     return data;
   }
 
-  private ArrayType getArrayType(Type type) {
-    return new ArrayType(type);
+  private long[] getDecimalLongData(Object val) {
+    BigDecimal[] data = (BigDecimal[]) val;
+    long[] longValues = new long[data.length];
+    for (int i = 0; i < data.length; i++) {
+      longValues[i] = data[i].longValue();
+    }
+    return longValues;
   }
 
   private Slice[] getParsedSlicesForDecimal(Slice[] slices, Type type) {
-    /*ArrayType arrType = ((ArrayType) type);
-        Type elemType = arrType.getElementType() ;*/
     Slice[] parsedSlices = new Slice[slices.length];
     for (int i = 0; i < slices.length; i++) {
       parsedSlices[i] =
-          parseSlice(DecimalType.createDecimalType()/*(DecimalType) elemType*/, slices[i], 0,
-              slices[i].length());
+          parseSlice(DecimalType.createDecimalType(), slices[i], 0, slices[i].length());
     }
     return parsedSlices;
   }
