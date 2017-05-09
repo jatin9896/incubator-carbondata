@@ -31,7 +31,6 @@ import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Decimals;
 import com.facebook.presto.spi.type.TimestampType;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.type.ArrayType;
 import com.google.common.base.Strings;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
@@ -162,9 +161,7 @@ public class CarbondataRecordCursor implements RecordCursor {
           Slice decimalSlice = Decimals.encodeUnscaledValue(unscaledDecimal);
           return utf8Slice(Decimals.toString(decimalSlice, actual.getScale()));
           //return decimalSlice;
-
         }
-
       }
     } else {
       checkFieldType(field, VARCHAR);
@@ -183,46 +180,56 @@ public class CarbondataRecordCursor implements RecordCursor {
         fieldValue.replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("\\s", "").split(",");
     String arrDataType = columnHandles.get(field).getColumnType().getDisplayName();
     if (arrDataType.contains("boolean")) {
-      Boolean[] results = new Boolean[data.length];
-      for (int i = 0; i < results.length; i++) {
-        results[i] = Boolean.parseBoolean(data[i]);
+      Boolean[] boolResults = new Boolean[data.length];
+      for (int i = 0; i < boolResults.length; i++) {
+        boolResults[i] = checkNullValue(data[i]) ? null : Boolean.parseBoolean(data[i]);
       }
-      return results;
+      return boolResults;
     } else if (arrDataType.contains("long") || arrDataType.contains("bigint")) {
-      Long[] results = new Long[data.length];
-
-      for (int i = 0; i < results.length; i++) {
-        results[i] = Long.parseLong(data[i]);
+      Long[] longResults = new Long[data.length];
+      for (int i = 0; i < longResults.length; i++) {
+        longResults[i] = checkNullValue(data[i]) ? null : Long.parseLong(data[i]);
       }
-      return results;
-    } else if (arrDataType.contains("double")) {
-      Double[] results = new Double[data.length];
-
-      for (int i = 0; i < results.length; i++) {
-        results[i] = Double.parseDouble(data[i]);
-      }
-      return results;
+      return longResults;
     } else if (arrDataType.contains("integer")) {
-      Integer[] results = new Integer[data.length];
-
-      for (int i = 0; i < results.length; i++) {
-        results[i] = Integer.parseInt(data[i]);
+      Integer[] IntResults = new Integer[data.length];
+      for (int i = 0; i < IntResults.length; i++) {
+        IntResults[i] = checkNullValue(data[i]) ? null : Integer.parseInt(data[i]);
       }
-      return results;
+      return IntResults;
+    } else if (arrDataType.contains("double")) {
+      Double[] doubleResults = new Double[data.length];
+      for (int i = 0; i < doubleResults.length; i++) {
+        doubleResults[i] = checkNullValue(data[i]) ? null : Double.parseDouble(data[i]);
+      }
+      return doubleResults;
     } else if (arrDataType.contains("float")) {
-      Float[] results = new Float[data.length];
-      for (int i = 0; i < results.length; i++) {
-        results[i] = Float.parseFloat(data[i]);
+      Float[] floatResults = new Float[data.length];
+      for (int i = 0; i < floatResults.length; i++) {
+        floatResults[i] = checkNullValue(data[i]) ? null : Float.parseFloat(data[i]);
       }
-      return results;
-    } else if(arrDataType.contains("decimal")) {
-      BigDecimal[] results = new BigDecimal[data.length];
-      for( int i=0;i <data.length; i++) {
-        results[i] = new BigDecimal(data[i]);
+      return floatResults;
+    } else if (arrDataType.contains("decimal")) {
+      BigDecimal[] bigdecimalResults = new BigDecimal[data.length];
+      for (int i = 0; i < data.length; i++) {
+        bigdecimalResults[i] = checkNullValue(data[i]) ? null : new BigDecimal(data[i]);
       }
-      return results;
+      return bigdecimalResults;
+    } else if (arrDataType.contains("timestamp")) {
+      Long[] timestampResults = new Long[data.length];
+      for (int i = 0; i < timestampResults.length; i++) {
+        timestampResults[i] = checkNullValue(data[i]) ?
+            null :
+            new Timestamp(Long.parseLong(data[i])).getTime() / 1000;
+      }
+      return timestampResults;
+    } else {
+      return data;
     }
-    return data;
+  }
+
+  private boolean checkNullValue(String val) {
+    return val.equals("null");
   }
 
   @Override public boolean isNull(int field) {
