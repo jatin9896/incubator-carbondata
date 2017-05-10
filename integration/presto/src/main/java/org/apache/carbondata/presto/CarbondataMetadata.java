@@ -56,10 +56,8 @@ import com.facebook.presto.spi.type.IntegerType;
 import com.facebook.presto.spi.type.SmallintType;
 import com.facebook.presto.spi.type.TimestampType;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.spi.type.TypeSignatureParameter;
 import com.facebook.presto.spi.type.VarcharType;
 import com.facebook.presto.type.ArrayType;
-import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
@@ -154,60 +152,19 @@ public class CarbondataMetadata implements ConnectorMetadata {
         carbonTable.getCreateOrderColumn(schemaTableName.getTableName());
     Type columnType;
 
-    List<CarbonDimension> carbonDimensions = carbonTable.getAllDimensions();
-    for(CarbonColumn carbonColumn : carbonColumns) {
-      if(carbonColumn.isComplex()) {
-        CarbonDimension carbonDimension = (CarbonDimension) carbonColumn;
-        columnType = CarbondataType2SpiMapperForComplex(carbonDimension);
+    for (CarbonColumn carbonColumn : carbonColumns) {
+      CarbonDimension carbonDimension = (CarbonDimension) carbonColumn;
+      columnType = CarbondataType2SpiMapperForComplex(carbonDimension);
+      if (carbonColumn.isComplex()) {
         ColumnMetadata columnMeta =
             new ColumnMetadata(carbonDimension.getColumnSchema().getColumnName(), columnType);
         columnsMetaList.add(columnMeta);
       } else {
-        columnType = CarbondataType2SpiMapper(carbonColumn.getColumnSchema());
         ColumnMetadata columnMeta =
             new ColumnMetadata(carbonColumn.getColumnSchema().getColumnName(), columnType);
         columnsMetaList.add(columnMeta);
       }
-    /*}
-    for(CarbonDimension carbonDimension: carbonDimensions) {
-      if(carbonDimension.isComplex()) {
-        columnType = CarbondataType2SpiMapperForComplex(carbonDimension);
-        *//*ColumnMetadata columnMetaComplex =
-            new ColumnMetadata(carbonDimension.getColumnSchema().getColumnName(), columnType);
-        columnsMetaList.add(columnMetaComplex);*//*
-      }
-      else {
-        columnType = CarbondataType2SpiMapper(carbonDimension.getColumnSchema());
-      }
-      ColumnMetadata columnMeta =
-          new ColumnMetadata(carbonDimension.getColumnSchema().getColumnName(), columnType);
-      columnsMetaList.add(columnMeta);*/
     }
-    /*List<CarbonMeasure> carbonMeasures = carbonTable.getAllMeasures();
-    for (CarbonMeasure carbonMeasure : carbonMeasures) {
-      columnType = CarbondataType2SpiMapper(carbonMeasure.getColumnSchema());
-      ColumnMetadata columnMeta =
-          new ColumnMetadata(carbonMeasure.getColumnSchema().getColumnName(), columnType);
-      columnsMetaList.add(columnMeta);
-    }*/
-    /*for (CarbonColumn col : carbonColumns) {
-      //show columns command will return these data
-     *//* if(col.getColumnSchema().isComplex()){
-        CarbondataType2SpiMapperForComplex(col.getColumnSchema());
-      } else {
-
-      }*//*
-
-     if(col.isComplex()) {
-
-     } else {
-       columnType = CarbondataType2SpiMapper(col.getColumnSchema());
-     }
-      ColumnMetadata columnMeta =
-          new ColumnMetadata(col.getColumnSchema().getColumnName(), columnType);
-      columnsMetaList.add(columnMeta);
-    }*/
-
     //carbondata connector's table metadata
     return new ConnectorTableMetadata(schemaTableName, columnsMetaList);
   }
@@ -237,19 +194,19 @@ public class CarbondataMetadata implements ConnectorMetadata {
     for (CarbonDimension column : cb.getDimensionByTableName(tableName)) {
       ColumnSchema cs = column.getColumnSchema();
 
-      int complex = column.getComplexTypeOrdinal();
-      column.getNumberOfChild();
-      column.getListOfChildDimensions();
       Type spiType;
-      if (column.isComplex()) {
-        spiType = CarbondataType2SpiMapperForComplex(column);
+      spiType = CarbondataType2SpiMapperForComplex(column);
+      if (column.isComplex() && spiType instanceof ArrayType) {
         columnHandles.put(column.getColumnSchema().getColumnName(),
-            new CarbondataColumnHandle(connectorId, column/*.getListOfChildDimensions().get(0)*/.getColumnSchema().getColumnName(), spiType,
-                column.getSchemaOrdinal(), column.getKeyOrdinal(), column.getColumnGroupOrdinal(),
-                false, column.getListOfChildDimensions().get(0).getColumnSchema().getColumnGroupId(), column.getListOfChildDimensions().get(0).getColumnSchema().getColumnUniqueId(), cs.isUseInvertedIndex(),
-                column.getListOfChildDimensions().get(0).getColumnSchema().getPrecision(), column.getListOfChildDimensions().get(0).getColumnSchema().getScale()));
+            new CarbondataColumnHandle(connectorId, column.getColumnSchema().getColumnName(),
+                spiType, column.getSchemaOrdinal(), column.getKeyOrdinal(),
+                column.getColumnGroupOrdinal(), false,
+                column.getListOfChildDimensions().get(0).getColumnSchema().getColumnGroupId(),
+                column.getListOfChildDimensions().get(0).getColumnSchema().getColumnUniqueId(),
+                cs.isUseInvertedIndex(),
+                column.getListOfChildDimensions().get(0).getColumnSchema().getPrecision(),
+                column.getListOfChildDimensions().get(0).getColumnSchema().getScale()));
       } else {
-        spiType = CarbondataType2SpiMapper(cs);
         columnHandles.put(cs.getColumnName(),
             new CarbondataColumnHandle(connectorId, cs.getColumnName(), spiType,
                 column.getSchemaOrdinal(), column.getKeyOrdinal(), column.getColumnGroupOrdinal(),
@@ -257,17 +214,10 @@ public class CarbondataMetadata implements ConnectorMetadata {
                 cs.getPrecision(), cs.getScale()));
 
       }
-      }
+    }
 
     for (CarbonMeasure measure : cb.getMeasureByTableName(tableName)) {
       ColumnSchema cs = measure.getColumnSchema();
-      /*Type spiType;
-      if(measure.isComplex()) {
-        measure.
-        spiType = CarbondataType2SpiMapperForComplex(column);
-      } else {
-
-      }*/
 
       Type spiType = CarbondataType2SpiMapper(cs);
       columnHandles.put(cs.getColumnName(),
