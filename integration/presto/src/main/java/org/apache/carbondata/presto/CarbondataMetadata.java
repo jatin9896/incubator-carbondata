@@ -153,13 +153,14 @@ public class CarbondataMetadata implements ConnectorMetadata {
     Type columnType;
 
     for (CarbonColumn carbonColumn : carbonColumns) {
-      CarbonDimension carbonDimension = (CarbonDimension) carbonColumn;
-      columnType = CarbondataType2SpiMapperForComplex(carbonDimension);
       if (carbonColumn.isComplex()) {
+        CarbonDimension carbonDimension = (CarbonDimension) carbonColumn;
+        columnType = CarbondataType2SpiMapperForComplex(carbonDimension);
         ColumnMetadata columnMeta =
             new ColumnMetadata(carbonDimension.getColumnSchema().getColumnName(), columnType);
         columnsMetaList.add(columnMeta);
       } else {
+        columnType = CarbondataType2SpiMapper(carbonColumn.getColumnSchema());
         ColumnMetadata columnMeta =
             new ColumnMetadata(carbonColumn.getColumnSchema().getColumnName(), columnType);
         columnsMetaList.add(columnMeta);
