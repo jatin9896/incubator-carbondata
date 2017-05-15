@@ -210,11 +210,11 @@ public class CarbondataRecordCursor implements RecordCursor {
       }
       return floatResults;
     } else if (arrDataType.contains("decimal")) {
-      BigDecimal[] bigdecimalResults = new BigDecimal[data.length];
+      BigDecimal[] bigDecimalResults = new BigDecimal[data.length];
       for (int i = 0; i < data.length; i++) {
-        bigdecimalResults[i] = checkNullValue(data[i]) ? null : new BigDecimal(data[i]);
+        bigDecimalResults[i] = checkNullValue(data[i]) ? null : new BigDecimal(data[i]);
       }
-      return bigdecimalResults;
+      return bigDecimalResults;
     } else if (arrDataType.contains("timestamp")) {
       Long[] timestampResults = new Long[data.length];
       for (int i = 0; i < timestampResults.length; i++) {

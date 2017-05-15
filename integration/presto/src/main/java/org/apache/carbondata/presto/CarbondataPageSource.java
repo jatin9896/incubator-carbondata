@@ -125,16 +125,7 @@ public class CarbondataPageSource implements ConnectorPageSource {
                 break;
               case "Slice":
                 Slice slice = cursor.getSlice(column);
-                if (type instanceof DecimalType) {
-                  if (isShortDecimal(type)) {
-                    type.writeLong(output, parseLong((DecimalType) type, slice, 0, slice.length()));
-                  } else {
-                    type.writeSlice(output,
-                        parseSlice((DecimalType) type, slice, 0, slice.length()));
-                  }
-                } else {
-                  type.writeSlice(output, slice, 0, slice.length());
-                }
+                writeSlice(slice, type, output);
                 break;
               default:
                 type.writeObject(output, cursor.getObject(column));
@@ -151,6 +142,18 @@ public class CarbondataPageSource implements ConnectorPageSource {
     Page page = pageBuilder.build();
     pageBuilder.reset();
     return page;
+  }
+
+  private void writeSlice(Slice slice, Type type, BlockBuilder output) {
+    if (type instanceof DecimalType) {
+      if (isShortDecimal(type)) {
+        type.writeLong(output, parseLong((DecimalType) type, slice, 0, slice.length()));
+      } else {
+        type.writeSlice(output, parseSlice((DecimalType) type, slice, 0, slice.length()));
+      }
+    } else {
+      type.writeSlice(output, slice, 0, slice.length());
+    }
   }
 
   private void writeObject(Object val, BlockBuilder output, Type type) {

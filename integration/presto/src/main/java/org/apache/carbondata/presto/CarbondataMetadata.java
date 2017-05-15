@@ -305,12 +305,7 @@ public class CarbondataMetadata implements ConnectorMetadata {
       case DOUBLE:
         return DoubleType.DOUBLE;
       case DECIMAL:
-        if (columnSchema.getPrecision() > 0) {
-          return DecimalType
-              .createDecimalType(columnSchema.getPrecision(), columnSchema.getScale());
-        } else {
-          return DecimalType.createDecimalType();
-        }
+        getDecimalType(columnSchema);
       case STRING:
         return VarcharType.VARCHAR;
       case DATE:
@@ -320,6 +315,13 @@ public class CarbondataMetadata implements ConnectorMetadata {
       default:
         return VarcharType.VARCHAR;
     }
+  }
+
+  private static Type getDecimalType(ColumnSchema columnSchema) {
+
+    return columnSchema.getPrecision() > 0 ?
+        DecimalType.createDecimalType(columnSchema.getPrecision(), columnSchema.getScale()) :
+        DecimalType.createDecimalType();
   }
 
 }
