@@ -18,6 +18,7 @@
 package org.apache.carbondata.presto;
 
 import javax.inject.Inject;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -58,12 +59,15 @@ import com.facebook.presto.spi.type.TimestampType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.VarcharType;
 import com.facebook.presto.type.ArrayType;
+import com.facebook.presto.type.RowType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import org.apache.hadoop.hdfs.protocol.datatransfer.Op;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 import static org.apache.carbondata.core.metadata.datatype.DataType.ARRAY;
+import static org.apache.carbondata.core.metadata.datatype.DataType.STRUCT;
 import static org.apache.carbondata.presto.Types.checkType;
 
 public class CarbondataMetadata implements ConnectorMetadata {
@@ -207,7 +211,13 @@ public class CarbondataMetadata implements ConnectorMetadata {
                 cs.isUseInvertedIndex(),
                 column.getListOfChildDimensions().get(0).getColumnSchema().getPrecision(),
                 column.getListOfChildDimensions().get(0).getColumnSchema().getScale()));
-      } else {
+      }
+      /*//TODO: Code for Struct type
+      else if(column.isComplex() && spiType instanceof RowType) {
+            columnHandles.put(column.getColumnSchema().getColumnName(), new CarbondataColumnHandle(connectorId, column.getSchemaOrdinal(), column.getKeyOrdinal(),
+                column.getColumnGroupOrdinal(), false, column.getListOfChildDimensions().get()))
+      }*/
+        else {
         columnHandles.put(cs.getColumnName(),
             new CarbondataColumnHandle(connectorId, cs.getColumnName(), spiType,
                 column.getSchemaOrdinal(), column.getKeyOrdinal(), column.getColumnGroupOrdinal(),
@@ -285,6 +295,15 @@ public class CarbondataMetadata implements ConnectorMetadata {
     if (colType == ARRAY) {
       return new ArrayType(CarbondataType2SpiMapper(
           carbonDimension.getListOfChildDimensions().get(0).getColumnSchema()));
+    } else if(colType == STRUCT) {
+      List<CarbonDimension> childDimensions = carbonDimension.getListOfChildDimensions();
+      List<Type> fieldTypes = new ArrayList<>(childDimensions.size());
+      List<String> fieldNames = new ArrayList<>(childDimensions.size());
+      for(int i =0;i <childDimensions.size(); i++) {
+        fieldTypes.add(CarbondataType2SpiMapperForComplex(childDimensions.get(i)));
+        fieldNames.add(childDimensions.get(i).getColName());
+      }
+      return new RowType(fieldTypes, Optional.of(fieldNames));
     }
     return CarbondataType2SpiMapper(columnSchema);
   }

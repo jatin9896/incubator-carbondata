@@ -31,6 +31,7 @@ import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Decimals;
 import com.facebook.presto.spi.type.TimestampType;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.type.ArrayType;
 import com.google.common.base.Strings;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
@@ -170,8 +171,19 @@ public class CarbondataRecordCursor implements RecordCursor {
   }
 
   @Override public Object getObject(int field) {
-    Object arrValues = getData(field);
-    return arrValues;
+    if(columnHandles.get(field).getColumnType() instanceof ArrayType) {
+      Object arrValues = getData(field);
+      return arrValues;
+    } else {
+        return getStructData(field);
+    }
+  }
+
+  private Object getStructData(int field) {
+    String fieldValue = getFieldValue(field);
+
+//TODO: Parse the struct data in String form
+    return new Object();
   }
 
   private Object getData(int field) {
