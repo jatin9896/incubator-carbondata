@@ -24,7 +24,7 @@ This tutorial provides a quick introduction to using CarbonData.
 * [Installation and building CarbonData](https://github.com/apache/incubator-carbondata/blob/master/build).
 * Create a sample.csv file using the following commands. The CSV file is required for loading data into CarbonData.
 
-  ```
+```
   cd carbondata
   cat > sample.csv << EOF
   id,name,city,age
@@ -32,8 +32,7 @@ This tutorial provides a quick introduction to using CarbonData.
   2,eason,shenzhen,27
   3,jarry,wuhan,35
   EOF
-  ```
-
+```
 ## Interactive Analysis with Spark Shell Version 2.1
 
 Apache Spark Shell provides a simple way to learn the API, as well as a powerful tool to analyze data interactively. Please visit [Apache Spark Documentation](http://spark.apache.org/docs/latest/) for more details on Spark shell.
