@@ -24,15 +24,15 @@ This tutorial provides a quick introduction to using CarbonData.
 * [Installation and building CarbonData](https://github.com/apache/incubator-carbondata/blob/master/build).
 * Create a sample.csv file using the following commands. The CSV file is required for loading data into CarbonData.
 
-```
-  cd carbondata
-  cat > sample.csv << EOF
-  id,name,city,age
-  1,david,shenzhen,31
-  2,eason,shenzhen,27
-  3,jarry,wuhan,35
-  EOF
-```
+    ```
+      cd carbondata
+      cat > sample.csv << EOF
+      id,name,city,age
+      1,david,shenzhen,31
+      2,eason,shenzhen,27
+      3,jarry,wuhan,35
+      EOF
+    ```
 ## Interactive Analysis with Spark Shell Version 2.1
 
 Apache Spark Shell provides a simple way to learn the API, as well as a powerful tool to analyze data interactively. Please visit [Apache Spark Documentation](http://spark.apache.org/docs/latest/) for more details on Spark shell.
@@ -41,10 +41,10 @@ Apache Spark Shell provides a simple way to learn the API, as well as a powerful
 
 Start Spark shell by running the following command in the Spark directory:
 
-```
-./bin/spark-shell --jars <carbondata assembly jar path>
-```
-**NOTE**: Assembly jar will be available after [building CarbonData](https://github.com/apache/incubator-carbondata/blob/master/build/README.md) and can be copied from `./assembly/target/scala-2.1x/carbondata_xxx.jar`
+    ```
+    ./bin/spark-shell --jars <carbondata assembly jar path>
+    ```
+**NOTE**: Assembly jar will be available after [building CarbonData](https://github.com/apache/carbondata/blob/master/build/README.md) and can be copied from `./assembly/target/scala-2.1x/carbondata_xxx.jar`
 
 In this shell, SparkSession is readily available as `spark` and Spark context is readily available as `sc`.
 
