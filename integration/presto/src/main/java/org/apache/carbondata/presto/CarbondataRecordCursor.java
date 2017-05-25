@@ -32,6 +32,7 @@ import com.facebook.presto.spi.type.Decimals;
 import com.facebook.presto.spi.type.TimestampType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.type.ArrayType;
+import com.facebook.presto.type.RowType;
 import com.google.common.base.Strings;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
@@ -171,19 +172,41 @@ public class CarbondataRecordCursor implements RecordCursor {
   }
 
   @Override public Object getObject(int field) {
-    if(columnHandles.get(field).getColumnType() instanceof ArrayType) {
+    if (columnHandles.get(field).getColumnType() instanceof ArrayType) {
       Object arrValues = getData(field);
       return arrValues;
     } else {
-        return getStructData(field);
+      return getStructData(field);
     }
   }
 
   private Object getStructData(int field) {
     String fieldValue = getFieldValue(field);
 
-//TODO: Parse the struct data in String form
-    return new Object();
+    //TODO: Parse the struct data in String form
+    return parseStructData(fieldValue, field);
+  }
+
+  private Object parseStructData(String fieldValue, int field) {
+    String[] data =
+        fieldValue.replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("\\s", "").split(",");
+    List<Type> elemTypes = columnHandles.get(field).getColumnType().getTypeParameters();
+    Object[] parsedData = new Object[data.length];
+    Type[] structTypes = new Type[data.length];
+    for (int i = 0; i < data.length; i++) {
+      structTypes[i] = elemTypes.get(i);
+      parsedData[i] = getStructElement(data[i], structTypes[i]);
+    }
+    return parsedData;
+  }
+
+  private Object getStructElement(String elem, Type elemType) {
+    if (elemType.getDisplayName().equals("integer")) {
+      return Integer.parseInt(elem);
+    } else if (elemType.getDisplayName().equals("varchar")) {
+      return elem;
+    } else
+      return elem;
   }
 
   private Object getData(int field) {

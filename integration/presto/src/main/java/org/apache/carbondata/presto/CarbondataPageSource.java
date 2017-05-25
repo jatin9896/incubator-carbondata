@@ -160,6 +160,7 @@ public class CarbondataPageSource implements ConnectorPageSource {
     Class arrTypeClass = val.getClass().getComponentType();
     String arrClassName = arrTypeClass.getSimpleName();
     boolean[] isNull = checkNull(val);
+
     switch (arrClassName) {
       case "Integer":
         int[] intArray = getIntData((Integer[]) val);
@@ -183,6 +184,7 @@ public class CarbondataPageSource implements ConnectorPageSource {
         Slice[] booleanSlices = getBooleanSlices(val);
         type.writeObject(output, new SliceArrayBlock(booleanSlices.length, booleanSlices));
         break;
+      case "":
       default:
         long[] longDecimalValues = getLongDataForDecimal((BigDecimal[]) val);
         type.writeObject(output,
