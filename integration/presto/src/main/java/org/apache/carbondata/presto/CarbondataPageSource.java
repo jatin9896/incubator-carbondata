@@ -28,8 +28,11 @@ import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.RecordSet;
+import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.block.IntArrayBlock;
+import com.facebook.presto.spi.block.InterleavedBlock;
 import com.facebook.presto.spi.block.LongArrayBlock;
 import com.facebook.presto.spi.block.SliceArrayBlock;
 import com.facebook.presto.spi.type.DecimalType;
@@ -161,34 +164,51 @@ public class CarbondataPageSource implements ConnectorPageSource {
     String arrClassName = arrTypeClass.getSimpleName();
     boolean[] isNull = checkNull(val);
 
-    switch (arrClassName) {
-      case "Integer":
-        int[] intArray = getIntData((Integer[]) val);
-        type.writeObject(output, new IntArrayBlock(intArray.length, isNull, intArray));
-        break;
-      case "Long":
-        long[] longArray = getLongData((Long[]) val);
-        type.writeObject(output, new LongArrayBlock(longArray.length, isNull, longArray));
-        break;
-      case "String":
-        Slice[] stringSlices = getStringSlices(val);
-        type.writeObject(output, new SliceArrayBlock(stringSlices.length, stringSlices));
-        break;
-      case "Double":
-      case "Float":
-        Double[] data = (Double[]) val;
-        long[] doubleLongData = getLongDataForDouble(data);
-        type.writeObject(output, new LongArrayBlock(doubleLongData.length, isNull, doubleLongData));
-        break;
-      case "Boolean":
-        Slice[] booleanSlices = getBooleanSlices(val);
-        type.writeObject(output, new SliceArrayBlock(booleanSlices.length, booleanSlices));
-        break;
-      case "":
-      default:
-        long[] longDecimalValues = getLongDataForDecimal((BigDecimal[]) val);
-        type.writeObject(output,
-            new LongArrayBlock(longDecimalValues.length, isNull, longDecimalValues));
+    if (type.getDisplayName().startsWith("row")) {
+      Object[] data = (Object[]) val;
+      List<Type> structElemTypes = type.getTypeParameters();
+      Block[] dataBlock = new Block[structElemTypes.size()];
+      for(int i=0;i <structElemTypes.size(); i++) {
+        switch(structElemTypes.get(i).getDisplayName()) {
+          case "integer" : int x = (Integer) data[i];
+          dataBlock[i] = new IntArrayBlock(1, isNull, new int[]{x});
+          break;
+          case "varchar" : Slice slice = utf8Slice((String)data[i]);
+            dataBlock[i] = new SliceArrayBlock(1, new Slice[]{slice});
+            break;
+        }
+      }
+type.writeObject(output, new InterleavedBlock(dataBlock));
+    } else {
+      switch (arrClassName) {
+        case "Integer":
+          int[] intArray = getIntData((Integer[]) val);
+          type.writeObject(output, new IntArrayBlock(intArray.length, isNull, intArray));
+          break;
+        case "Long":
+          long[] longArray = getLongData((Long[]) val);
+          type.writeObject(output, new LongArrayBlock(longArray.length, isNull, longArray));
+          break;
+        case "String":
+          Slice[] stringSlices = getStringSlices(val);
+          type.writeObject(output, new SliceArrayBlock(stringSlices.length, stringSlices));
+          break;
+        case "Double":
+        case "Float":
+          Double[] data = (Double[]) val;
+          long[] doubleLongData = getLongDataForDouble(data);
+          type.writeObject(output, new LongArrayBlock(doubleLongData.length, isNull, doubleLongData));
+          break;
+        case "Boolean":
+          Slice[] booleanSlices = getBooleanSlices(val);
+          type.writeObject(output, new SliceArrayBlock(booleanSlices.length, booleanSlices));
+          break;
+        case "":
+        default:
+          long[] longDecimalValues = getLongDataForDecimal((BigDecimal[]) val);
+          type.writeObject(output,
+              new LongArrayBlock(longDecimalValues.length, isNull, longDecimalValues));
+      }
     }
   }
 
