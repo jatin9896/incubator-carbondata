@@ -201,12 +201,28 @@ public class CarbondataRecordCursor implements RecordCursor {
   }
 
   private Object getStructElement(String elem, Type elemType) {
-    if (elemType.getDisplayName().equals("integer")) {
-      return Integer.parseInt(elem);
-    } else if (elemType.getDisplayName().equals("varchar")) {
-      return elem;
-    } else
-      return elem;
+    if (checkNullValue(elem))
+      return null;
+    else {
+      String elementType = elemType.getDisplayName();
+      switch (elementType) {
+        case "integer":
+          return Integer.parseInt(elem);
+        case "boolean":
+          return Boolean.parseBoolean(elem);
+        case "long":
+          return Long.parseLong(elem);
+        case "double":
+          return Double.parseDouble(elem);
+        case "float":
+          return Float.parseFloat(elem);
+        case "decimal":
+          return new BigDecimal(elem);
+        case "timestamp":
+          return new Timestamp(Long.parseLong(elem)).getTime() / 1000;
+        default: return elem;
+      }
+    }
   }
 
   private Object getData(int field) {
