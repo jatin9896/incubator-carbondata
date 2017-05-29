@@ -183,14 +183,11 @@ public class CarbondataPageSource implements ConnectorPageSource {
                         Slice booleanData = utf8Slice(Boolean.toString((Boolean) data[i]));
                         dataBlock[i] = new SliceArrayBlock(1, new Slice[]{booleanData});
                         break;
-                    case "double":
                     case "float":
-                        long doubleData = (Long) data[i];
-                        dataBlock[i] = new LongArrayBlock(1, isNull, new long[]{doubleData});
+                    case "double":
+                        double doubleData = (Double) data[i];
+                        dataBlock[i] = new LongArrayBlock(1, isNull, new long[]{Double.doubleToLongBits(doubleData)});
                         break;
-                    /*case "timestamp" : Long timestampData = (Long) data[i];
-                        dataBlock[i] = new LongArrayBlock(1, isNull, new long[]{timestampData});
-                        break;*/
                     default:
                         long longForDecimal=(new BigDecimal((String)data[i])).longValue();
                         dataBlock[i] =  new LongArrayBlock(1,isNull,new long[]{longForDecimal});
