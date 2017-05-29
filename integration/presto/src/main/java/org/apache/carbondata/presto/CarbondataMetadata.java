@@ -324,7 +324,7 @@ public class CarbondataMetadata implements ConnectorMetadata {
       case DOUBLE:
         return DoubleType.DOUBLE;
       case DECIMAL:
-        getDecimalType(columnSchema);
+        return getDecimalType(columnSchema);
       case STRING:
         return VarcharType.VARCHAR;
       case DATE:

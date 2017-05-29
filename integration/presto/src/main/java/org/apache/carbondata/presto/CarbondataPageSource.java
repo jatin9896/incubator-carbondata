@@ -173,6 +173,8 @@ public class CarbondataPageSource implements ConnectorPageSource {
                         Slice slice = utf8Slice((String) data[i]);
                         dataBlock[i] = new SliceArrayBlock(1, new Slice[]{slice});
                         break;
+                    case "timestamp" :
+                    case "bigint" :
                     case "long":
                         Long longData = (Long) data[i];
                         dataBlock[i] = new LongArrayBlock(1, isNull, new long[]{longData});
@@ -186,8 +188,11 @@ public class CarbondataPageSource implements ConnectorPageSource {
                         long doubleData = (Long) data[i];
                         dataBlock[i] = new LongArrayBlock(1, isNull, new long[]{doubleData});
                         break;
+                    /*case "timestamp" : Long timestampData = (Long) data[i];
+                        dataBlock[i] = new LongArrayBlock(1, isNull, new long[]{timestampData});
+                        break;*/
                     default:
-                        long longForDecimal=((BigDecimal)data[i]).longValue();
+                        long longForDecimal=(new BigDecimal((String)data[i])).longValue();
                         dataBlock[i] =  new LongArrayBlock(1,isNull,new long[]{longForDecimal});
                 }
             }

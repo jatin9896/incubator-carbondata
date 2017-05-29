@@ -32,7 +32,6 @@ import com.facebook.presto.spi.type.Decimals;
 import com.facebook.presto.spi.type.TimestampType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.type.ArrayType;
-import com.facebook.presto.type.RowType;
 import com.google.common.base.Strings;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
@@ -201,8 +200,7 @@ public class CarbondataRecordCursor implements RecordCursor {
   }
 
   private Object getStructElement(String elem, Type elemType) {
-    if (checkNullValue(elem))
-      return null;
+    if (checkNullValue(elem)) return null;
     else {
       String elementType = elemType.getDisplayName();
       switch (elementType) {
@@ -210,6 +208,7 @@ public class CarbondataRecordCursor implements RecordCursor {
           return Integer.parseInt(elem);
         case "boolean":
           return Boolean.parseBoolean(elem);
+        case "bigint":
         case "long":
           return Long.parseLong(elem);
         case "double":
@@ -220,7 +219,8 @@ public class CarbondataRecordCursor implements RecordCursor {
           return new BigDecimal(elem);
         case "timestamp":
           return new Timestamp(Long.parseLong(elem)).getTime() / 1000;
-        default: return elem;
+        default:
+          return elem;
       }
     }
   }
