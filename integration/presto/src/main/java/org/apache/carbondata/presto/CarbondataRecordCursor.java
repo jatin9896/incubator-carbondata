@@ -31,7 +31,6 @@ import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Decimals;
 import com.facebook.presto.spi.type.TimestampType;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.type.ArrayType;
 import com.google.common.base.Strings;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
@@ -171,7 +170,7 @@ public class CarbondataRecordCursor implements RecordCursor {
   }
 
   @Override public Object getObject(int field) {
-    if (columnHandles.get(field).getColumnType() instanceof ArrayType) {
+    if (columnHandles.get(field).getColumnType().getDisplayName().startsWith("array")) {
       Object arrValues = getData(field);
       return arrValues;
     } else {
@@ -200,30 +199,28 @@ public class CarbondataRecordCursor implements RecordCursor {
   }
 
   private Object getStructElement(String elem, Type elemType) {
-    if (checkNullValue(elem)) return null;
+    if (checkNullValue(elem))
+      return null;
     else {
       String elementType = elemType.getDisplayName();
-      switch (elementType) {
-        case "integer":
-          return Integer.parseInt(elem);
-        case "boolean":
-          return Boolean.parseBoolean(elem);
-        case "bigint":
-        case "long":
-          return Long.parseLong(elem);
-        case "double":
-          return Double.parseDouble(elem);
-        case "float":
-          return Float.parseFloat(elem);
-        case "decimal":
-          return new BigDecimal(elem);
-        case "timestamp":
-          return new Timestamp(Long.parseLong(elem)).getTime() / 1000;
-        case "smallint":
-          return Short.parseShort(elem);
-        default:
-          return elem;
-      }
+      if(elementType.equals("integer"))
+        return Integer.parseInt(elem);
+      else if(elementType.equals("boolean"))
+        return Boolean.parseBoolean(elem);
+      else if(elementType.equals("bigint") || elementType.equals("long"))
+        return Long.parseLong(elem);
+      else if(elementType.equals("double"))
+        return Double.parseDouble(elem);
+      else if(elementType.equals("float"))
+        return Float.parseFloat(elem);
+      else if(elementType.contains("decimal"))
+        return new BigDecimal(elem);
+      else if(elementType.equals("timestamp"))
+        return new Timestamp(Long.parseLong(elem)).getTime() / 1000;
+      else if(elementType.equals("smallint"))
+        return Short.parseShort(elem);
+      else
+        return elem;
     }
   }
 
