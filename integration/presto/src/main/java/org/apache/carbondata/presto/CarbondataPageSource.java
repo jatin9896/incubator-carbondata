@@ -169,6 +169,10 @@ public class CarbondataPageSource implements ConnectorPageSource {
                         int intData = (Integer) data[i];
                         dataBlock[i] = new IntArrayBlock(1, isNull, new int[]{intData});
                         break;
+                    case "smallint":
+                        short shortData=(Short)data[i];
+                        dataBlock[i]=new ShortArrayBlock(1,isNull,new short[]{shortData});
+                        break;
                     case "varchar":
                         Slice slice = utf8Slice((String) data[i]);
                         dataBlock[i] = new SliceArrayBlock(1, new Slice[]{slice});

@@ -219,6 +219,8 @@ public class CarbondataRecordCursor implements RecordCursor {
           return new BigDecimal(elem);
         case "timestamp":
           return new Timestamp(Long.parseLong(elem)).getTime() / 1000;
+        case "smallint":
+          return Short.parseShort(elem);
         default:
           return elem;
       }
