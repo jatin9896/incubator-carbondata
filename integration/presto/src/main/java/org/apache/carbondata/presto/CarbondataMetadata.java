@@ -212,11 +212,7 @@ public class CarbondataMetadata implements ConnectorMetadata {
                 column.getListOfChildDimensions().get(0).getColumnSchema().getPrecision(),
                 column.getListOfChildDimensions().get(0).getColumnSchema().getScale()));
       }
-      /*//TODO: Code for Struct type
-      else if(column.isComplex() && spiType instanceof RowType) {
-            columnHandles.put(column.getColumnSchema().getColumnName(), new CarbondataColumnHandle(connectorId, column.getSchemaOrdinal(), column.getKeyOrdinal(),
-                column.getColumnGroupOrdinal(), false, column.getListOfChildDimensions().get()))
-      }*/
+
         else {
         columnHandles.put(cs.getColumnName(),
             new CarbondataColumnHandle(connectorId, cs.getColumnName(), spiType,

@@ -34,6 +34,7 @@ import com.facebook.presto.spi.type.Type;
 import com.google.common.base.Strings;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
+import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
 
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.Decimals.isShortDecimal;
@@ -57,6 +58,8 @@ public class CarbondataRecordCursor implements RecordCursor {
   private long totalBytes;
   private long nanoStart;
   private long nanoEnd;
+
+  private Object[] columnData;
 
   public CarbondataRecordCursor(CarbonReadSupport<Object[]> readSupport,
       CarbonIterator<Object[]> carbonIterator, List<CarbondataColumnHandle> columnHandles,
@@ -96,13 +99,13 @@ public class CarbondataRecordCursor implements RecordCursor {
 
     if (rowCursor.hasNext()) {
       Object[] columns = readSupport.readRow(rowCursor.next());
+      columnData = columns.clone();
       fields = new ArrayList<String>();
-      if(columns != null && columns.length > 0)
-      {
-        for(Object value : columns){
-          if(value != null )
-          {
+      if (columns != null && columns.length > 0) {
+        for (Object value : columns) {
+          if (value != null) {
             fields.add(value.toString());
+
           } else {
             fields.add(null);
           }
@@ -122,8 +125,8 @@ public class CarbondataRecordCursor implements RecordCursor {
   @Override public long getLong(int field) {
     String timeStr = getFieldValue(field);
     Type actual = getType(field);
-    if(actual instanceof TimestampType){
-      return new Timestamp(Long.parseLong(timeStr)).getTime()/1000;
+    if (actual instanceof TimestampType) {
+      return new Timestamp(Long.parseLong(timeStr)).getTime() / 1000;
     }
     //suppose the
     return Math.round(Double.parseDouble(getFieldValue(field)));
@@ -188,41 +191,53 @@ public class CarbondataRecordCursor implements RecordCursor {
   }
 
   private Object parseStructData(String fieldValue, int field) {
-    String[] data =
-        fieldValue.replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("\\s", "").split(",");
+
     List<Type> elemTypes = columnHandles.get(field).getColumnType().getTypeParameters();
-    Object[] parsedData = new Object[data.length];
-    Type[] structTypes = new Type[data.length];
+    Object[] parsedData = new Object[elemTypes.size()];
+    Object[] nestedStructElements;
+    for (int i = 0; i < elemTypes.size(); i++) {
+      if (elemTypes.get(i).getDisplayName().startsWith("row")) {
+        GenericInternalRow rowData = (GenericInternalRow) columnData[field];
+        String nestedStructData =
+            rowData.getStruct(i, elemTypes.get(i).getTypeParameters().size()).toString();
+        String[] nestedData =
+            nestedStructData.replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("\\s", "")
+                .split(",");
+        nestedStructElements = new Object[nestedData.length];
+        for (int j = 0; j < nestedData.length; j++) {
+          nestedStructElements[j] =
+              getStructElement(nestedData[j], elemTypes.get(i).getTypeParameters().get(j));
+        }
+        parsedData[i] = nestedStructElements;
+      } else {
+        GenericInternalRow rowData = (GenericInternalRow) columnData[field];
+        String nestedStructData = rowData.values()[i].toString();
+        parsedData[i] = getStructElement(nestedStructData, elemTypes.get(i));
+      }
+    }
+    /*Type[] structTypes = new Type[data.length];
     for (int i = 0; i < data.length; i++) {
       structTypes[i] = elemTypes.get(i);
       parsedData[i] = getStructElement(data[i], structTypes[i]);
-    }
+    }*/
     return parsedData;
   }
 
   private Object getStructElement(String elem, Type elemType) {
-    if (checkNullValue(elem))
-      return null;
+    if (checkNullValue(elem)) return null;
     else {
       String elementType = elemType.getDisplayName();
-      if(elementType.equals("integer"))
-        return Integer.parseInt(elem);
-      else if(elementType.equals("boolean"))
-        return Boolean.parseBoolean(elem);
-      else if(elementType.equals("bigint") || elementType.equals("long"))
+      if (elementType.equals("integer")) return Integer.parseInt(elem);
+      else if (elementType.equals("boolean")) return Boolean.parseBoolean(elem);
+      else if (elementType.equals("bigint") || elementType.equals("long"))
         return Long.parseLong(elem);
-      else if(elementType.equals("double"))
-        return Double.parseDouble(elem);
-      else if(elementType.equals("float"))
-        return Float.parseFloat(elem);
-      else if(elementType.contains("decimal"))
-        return new BigDecimal(elem);
-      else if(elementType.equals("timestamp"))
+      else if (elementType.equals("double")) return Double.parseDouble(elem);
+      else if (elementType.equals("float")) return Float.parseFloat(elem);
+      else if (elementType.contains("decimal")) return new BigDecimal(elem);
+      else if (elementType.equals("timestamp"))
         return new Timestamp(Long.parseLong(elem)).getTime() / 1000;
-      else if(elementType.equals("smallint"))
-        return Short.parseShort(elem);
-      else
-        return elem;
+      else if (elementType.equals("smallint")) return Short.parseShort(elem);
+      else return elem;
     }
   }
 
