@@ -17,29 +17,23 @@
 
 package org.apache.carbondata.presto;
 
-import com.facebook.presto.spi.RecordCursor;
-import com.facebook.presto.spi.type.DecimalType;
-import com.facebook.presto.spi.type.Decimals;
-import com.facebook.presto.spi.type.TimestampType;
-import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.spi.block.Block;
-import com.facebook.presto.spi.block.BlockBuilder;
-import com.facebook.presto.spi.block.BlockBuilderStatus;
-
-import com.google.common.base.Strings;
-import io.airlift.log.Logger;
-import io.airlift.slice.Slice;
-import io.airlift.slice.Slices;
-import org.apache.carbondata.common.CarbonIterator;
-import org.apache.carbondata.hadoop.readsupport.CarbonReadSupport;
-
-
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.carbondata.common.CarbonIterator;
+import org.apache.carbondata.hadoop.readsupport.CarbonReadSupport;
+
+import com.facebook.presto.spi.RecordCursor;
+import com.facebook.presto.spi.type.DecimalType;
+import com.facebook.presto.spi.type.Decimals;
+import com.facebook.presto.spi.type.TimestampType;
+import com.facebook.presto.spi.type.Type;
+import com.google.common.base.Strings;
+import io.airlift.log.Logger;
+import io.airlift.slice.Slice;
 
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.Decimals.isShortDecimal;
@@ -141,18 +135,19 @@ public class CarbondataRecordCursor implements RecordCursor {
   }
 
   @Override public Slice getSlice(int field) {
-    Type decimalType = getType(field);
-    if (decimalType instanceof DecimalType) {
-      DecimalType actual = (DecimalType) decimalType;
+    Type type = getType(field);
+    if (type instanceof DecimalType) {
+      DecimalType actual = (DecimalType) type;
       CarbondataColumnHandle carbondataColumnHandle = columnHandles.get(field);
-      if(carbondataColumnHandle.getPrecision() > 0 ) {
-        checkFieldType(field, DecimalType.createDecimalType(carbondataColumnHandle.getPrecision(), carbondataColumnHandle.getScale()));
+      if (carbondataColumnHandle.getPrecision() > 0) {
+        checkFieldType(field, DecimalType.createDecimalType(carbondataColumnHandle.getPrecision(),
+            carbondataColumnHandle.getScale()));
       } else {
         checkFieldType(field, DecimalType.createDecimalType());
       }
       String fieldValue = getFieldValue(field);
       BigDecimal bigDecimalValue = new BigDecimal(fieldValue);
-      if (isShortDecimal(decimalType)) {
+      if (isShortDecimal(type)) {
         return utf8Slice(Decimals.toString(bigDecimalValue.longValue(), actual.getScale()));
       } else {
         if (bigDecimalValue.scale() > actual.getScale()) {
@@ -168,9 +163,7 @@ public class CarbondataRecordCursor implements RecordCursor {
           Slice decimalSlice = Decimals.encodeUnscaledValue(unscaledDecimal);
           return utf8Slice(Decimals.toString(decimalSlice, actual.getScale()));
           //return decimalSlice;
-
         }
-
       }
     } else {
       checkFieldType(field, VARCHAR);
@@ -179,7 +172,116 @@ public class CarbondataRecordCursor implements RecordCursor {
   }
 
   @Override public Object getObject(int field) {
-    return null;
+    if (columnHandles.get(field).getColumnType().getDisplayName().startsWith("array")) {
+      Object arrValues = getData(field);
+      return arrValues;
+    } else {
+      return getStructData(field);
+    }
+  }
+
+  private Object getStructData(int field) {
+    String fieldValue = getFieldValue(field);
+
+    //TODO: Parse the struct data in String form
+    return parseStructData(fieldValue, field);
+  }
+
+  private Object parseStructData(String fieldValue, int field) {
+    String[] data =
+        fieldValue.replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("\\s", "").split(",");
+    List<Type> elemTypes = columnHandles.get(field).getColumnType().getTypeParameters();
+    Object[] parsedData = new Object[data.length];
+    Type[] structTypes = new Type[data.length];
+    for (int i = 0; i < data.length; i++) {
+      structTypes[i] = elemTypes.get(i);
+      parsedData[i] = getStructElement(data[i], structTypes[i]);
+    }
+    return parsedData;
+  }
+
+  private Object getStructElement(String elem, Type elemType) {
+    if (checkNullValue(elem))
+      return null;
+    else {
+      String elementType = elemType.getDisplayName();
+      if(elementType.equals("integer"))
+        return Integer.parseInt(elem);
+      else if(elementType.equals("boolean"))
+        return Boolean.parseBoolean(elem);
+      else if(elementType.equals("bigint") || elementType.equals("long"))
+        return Long.parseLong(elem);
+      else if(elementType.equals("double"))
+        return Double.parseDouble(elem);
+      else if(elementType.equals("float"))
+        return Float.parseFloat(elem);
+      else if(elementType.contains("decimal"))
+        return new BigDecimal(elem);
+      else if(elementType.equals("timestamp"))
+        return new Timestamp(Long.parseLong(elem)).getTime() / 1000;
+      else if(elementType.equals("smallint"))
+        return Short.parseShort(elem);
+      else
+        return elem;
+    }
+  }
+
+  private Object getData(int field) {
+    String fieldValue = getFieldValue(field);
+    String[] data =
+        fieldValue.replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("\\s", "").split(",");
+    String arrDataType = columnHandles.get(field).getColumnType().getDisplayName();
+    if (arrDataType.contains("boolean")) {
+      Boolean[] boolResults = new Boolean[data.length];
+      for (int i = 0; i < boolResults.length; i++) {
+        boolResults[i] = checkNullValue(data[i]) ? null : Boolean.parseBoolean(data[i]);
+      }
+      return boolResults;
+    } else if (arrDataType.contains("long") || arrDataType.contains("bigint")) {
+      Long[] longResults = new Long[data.length];
+      for (int i = 0; i < longResults.length; i++) {
+        longResults[i] = checkNullValue(data[i]) ? null : Long.parseLong(data[i]);
+      }
+      return longResults;
+    } else if (arrDataType.contains("integer")) {
+      Integer[] IntResults = new Integer[data.length];
+      for (int i = 0; i < IntResults.length; i++) {
+        IntResults[i] = checkNullValue(data[i]) ? null : Integer.parseInt(data[i]);
+      }
+      return IntResults;
+    } else if (arrDataType.contains("double")) {
+      Double[] doubleResults = new Double[data.length];
+      for (int i = 0; i < doubleResults.length; i++) {
+        doubleResults[i] = checkNullValue(data[i]) ? null : Double.parseDouble(data[i]);
+      }
+      return doubleResults;
+    } else if (arrDataType.contains("float")) {
+      Float[] floatResults = new Float[data.length];
+      for (int i = 0; i < floatResults.length; i++) {
+        floatResults[i] = checkNullValue(data[i]) ? null : Float.parseFloat(data[i]);
+      }
+      return floatResults;
+    } else if (arrDataType.contains("decimal")) {
+      BigDecimal[] bigDecimalResults = new BigDecimal[data.length];
+      for (int i = 0; i < data.length; i++) {
+        bigDecimalResults[i] = checkNullValue(data[i]) ? null : new BigDecimal(data[i]);
+      }
+      return bigDecimalResults;
+    } else if (arrDataType.contains("timestamp")) {
+      Long[] timestampResults = new Long[data.length];
+      for (int i = 0; i < timestampResults.length; i++) {
+        timestampResults[i] = checkNullValue(data[i]) ?
+            null :
+            new Timestamp(Long.parseLong(data[i])).getTime() / 1000;
+      }
+      return timestampResults;
+    } else {
+      return data;
+    }
+  }
+
+  private boolean checkNullValue(String val) {
+    return val.equals("null");
   }
 
   @Override public boolean isNull(int field) {
