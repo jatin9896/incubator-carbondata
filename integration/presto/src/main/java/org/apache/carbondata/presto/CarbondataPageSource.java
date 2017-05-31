@@ -169,14 +169,15 @@ public class CarbondataPageSource implements ConnectorPageSource {
       List<Type> structElemTypes = type.getTypeParameters();
       Block[] dataBlock = new Block[structElemTypes.size()];
       for (int i = 0; i < structElemTypes.size(); i++) {
+        boolean[] isElemNull = new boolean[] {isNull[i]};
         switch (structElemTypes.get(i).getDisplayName()) {
           case "integer":
             Integer[] intData = new Integer[] { (Integer) data[i] };
-            dataBlock[i] = new IntArrayBlock(intData.length, isNull, getIntData(intData));
+            dataBlock[i] = new IntArrayBlock(intData.length, isElemNull, getIntData(intData));
             break;
           case "smallint":
             Short[] shortData = new Short[] { (Short) data[i] };
-            dataBlock[i] = new ShortArrayBlock(shortData.length, isNull, getShortData(shortData));
+            dataBlock[i] = new ShortArrayBlock(shortData.length, isElemNull, getShortData(shortData));
             break;
           case "varchar":
             Slice slice = utf8Slice((String) data[i]);
@@ -186,7 +187,7 @@ public class CarbondataPageSource implements ConnectorPageSource {
           case "bigint":
           case "long":
             Long[] longValue = new Long[] { (Long) data[i] };
-            dataBlock[i] = new LongArrayBlock(longValue.length, isNull, getLongData(longValue));
+            dataBlock[i] = new LongArrayBlock(longValue.length, isElemNull, getLongData(longValue));
             break;
           case "boolean":
             Slice booleanData = utf8Slice(Boolean.toString((Boolean) data[i]));
@@ -196,11 +197,11 @@ public class CarbondataPageSource implements ConnectorPageSource {
           case "double":
             Double[] doubleData = new Double[] { (Double) data[i] };
             dataBlock[i] =
-                new LongArrayBlock(doubleData.length, isNull, getLongDataForDouble(doubleData));
+                new LongArrayBlock(doubleData.length, isElemNull, getLongDataForDouble(doubleData));
             break;
           default:
             BigDecimal[] longForDecimal = new BigDecimal[] { (BigDecimal) data[i] };
-            dataBlock[i] = new LongArrayBlock(longForDecimal.length, isNull,
+            dataBlock[i] = new LongArrayBlock(longForDecimal.length, isElemNull,
                 getLongDataForDecimal(longForDecimal));
         }
       }
