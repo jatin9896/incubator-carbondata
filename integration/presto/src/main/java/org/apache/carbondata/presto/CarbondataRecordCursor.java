@@ -211,15 +211,11 @@ public class CarbondataRecordCursor implements RecordCursor {
         parsedData[i] = nestedStructElements;
       } else {
         GenericInternalRow rowData = (GenericInternalRow) columnData[field];
-        String nestedStructData = rowData.values()[i].toString();
+        String nestedStructData = rowData.isNullAt(i) ? "null" : rowData.values()[i].toString();
         parsedData[i] = getStructElement(nestedStructData, elemTypes.get(i));
       }
     }
-    /*Type[] structTypes = new Type[data.length];
-    for (int i = 0; i < data.length; i++) {
-      structTypes[i] = elemTypes.get(i);
-      parsedData[i] = getStructElement(data[i], structTypes[i]);
-    }*/
+
     return parsedData;
   }
 

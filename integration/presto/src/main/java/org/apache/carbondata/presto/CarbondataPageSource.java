@@ -169,41 +169,8 @@ public class CarbondataPageSource implements ConnectorPageSource {
       List<Type> structElemTypes = type.getTypeParameters();
       Block[] dataBlock = new Block[structElemTypes.size()];
       for (int i = 0; i < structElemTypes.size(); i++) {
-        boolean[] isElemNull = new boolean[] {isNull[i]};
-        switch (structElemTypes.get(i).getDisplayName()) {
-          case "integer":
-            Integer[] intData = new Integer[] { (Integer) data[i] };
-            dataBlock[i] = new IntArrayBlock(intData.length, isElemNull, getIntData(intData));
-            break;
-          case "smallint":
-            Short[] shortData = new Short[] { (Short) data[i] };
-            dataBlock[i] = new ShortArrayBlock(shortData.length, isElemNull, getShortData(shortData));
-            break;
-          case "varchar":
-            Slice slice = utf8Slice((String) data[i]);
-            dataBlock[i] = new SliceArrayBlock(1, new Slice[] { slice });
-            break;
-          case "timestamp":
-          case "bigint":
-          case "long":
-            Long[] longValue = new Long[] { (Long) data[i] };
-            dataBlock[i] = new LongArrayBlock(longValue.length, isElemNull, getLongData(longValue));
-            break;
-          case "boolean":
-            Slice booleanData = utf8Slice(Boolean.toString((Boolean) data[i]));
-            dataBlock[i] = new SliceArrayBlock(1, new Slice[] { booleanData });
-            break;
-          case "float":
-          case "double":
-            Double[] doubleData = new Double[] { (Double) data[i] };
-            dataBlock[i] =
-                new LongArrayBlock(doubleData.length, isElemNull, getLongDataForDouble(doubleData));
-            break;
-          default:
-            BigDecimal[] longForDecimal = new BigDecimal[] { (BigDecimal) data[i] };
-            dataBlock[i] = new LongArrayBlock(longForDecimal.length, isElemNull,
-                getLongDataForDecimal(longForDecimal));
-        }
+        //boolean[] isElemNull = new boolean[] { isNull[i] };
+        dataBlock[i] = getElementBlock(output, structElemTypes.get(i), data[i]);
       }
 
       type.writeObject(output, new InterleavedBlock(dataBlock));
@@ -238,6 +205,49 @@ public class CarbondataPageSource implements ConnectorPageSource {
           long[] longDecimalValues = getLongDataForDecimal((BigDecimal[]) val);
           type.writeObject(output,
               new LongArrayBlock(longDecimalValues.length, isNull, longDecimalValues));
+      }
+    }
+  }
+
+  private Block getElementBlock(BlockBuilder output, Type structElemType, Object data) {
+    if (structElemType.getDisplayName().startsWith("row")) {
+      int nStructElements = structElemType.getTypeParameters().size();
+      Block[] structBlocks = new Block[nStructElements];
+      Object[] structElements = (Object[]) data;
+      for (int i = 0; i < nStructElements; i++) {
+        structBlocks[i] =
+            getElementBlock(output, structElemType.getTypeParameters().get(i), structElements[i]);
+      }
+      return new InterleavedBlock(structBlocks);
+     // structElemType.writeObject(output, new InterleavedBlock(structBlocks));
+    } else {
+      switch (structElemType.getDisplayName()) {
+        case "integer":
+          Integer[] intData = new Integer[] { (Integer) data };
+          return new IntArrayBlock(intData.length, new boolean[] { checkNullElement(data) }, getIntData(intData));
+        case "smallint":
+          Short[] shortData = new Short[] { (Short) data };
+          return new ShortArrayBlock(shortData.length, new boolean[] { checkNullElement(data) }, getShortData(shortData));
+        case "varchar":
+          Slice slice = utf8Slice((String) data);
+          return new SliceArrayBlock(1, new Slice[] { slice });
+        case "timestamp":
+        case "bigint":
+        case "long":
+          Long[] longValue = new Long[] { (Long) data };
+          return new LongArrayBlock(longValue.length, new boolean[] { checkNullElement(data) }, getLongData(longValue));
+        case "boolean":
+          Slice booleanData = utf8Slice(Boolean.toString((Boolean) data));
+          return new SliceArrayBlock(1, new Slice[] { booleanData });
+        case "float":
+        case "double":
+          Double[] doubleData = new Double[] { (Double) data };
+          return new LongArrayBlock(doubleData.length, new boolean[] { checkNullElement(data) },
+              getLongDataForDouble(doubleData));
+        default:
+          BigDecimal[] longForDecimal = new BigDecimal[] { (BigDecimal) data };
+          return new LongArrayBlock(longForDecimal.length, new boolean[] { checkNullElement(data) },
+              getLongDataForDecimal(longForDecimal));
       }
     }
   }
@@ -310,9 +320,13 @@ public class CarbondataPageSource implements ConnectorPageSource {
     boolean[] isNull = new boolean[arrData.length];
     int i;
     for (i = 0; i < arrData.length; i++) {
-      isNull[i] = Objects.isNull(arrData[i]);
+      isNull[i] = checkNullElement(arrData[i]);
     }
     return isNull;
+  }
+
+  private boolean checkNullElement(Object val) {
+    return Objects.isNull(val);
   }
 
   @Override public long getSystemMemoryUsage() {
