@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.carbondata.common.CarbonIterator;
@@ -175,44 +176,48 @@ public class CarbondataRecordCursor implements RecordCursor {
   }
 
   @Override public Object getObject(int field) {
-    if (columnHandles.get(field).getColumnType().getDisplayName().startsWith("array")) {
+    if (columnHandles.get(field).getColumnType().getTypeSignature().getBase().equals("array")) {
       Object arrValues = getData(field);
       return arrValues;
     } else {
-      return getStructData(field);
+      return parseStructData(field);
     }
   }
 
-  private Object getStructData(int field) {
-    String fieldValue = getFieldValue(field);
-
-    //TODO: Parse the struct data in String form
-    return parseStructData(fieldValue, field);
-  }
-
-  private Object parseStructData(String fieldValue, int field) {
+  private Object parseStructData(int field) {
 
     List<Type> elemTypes = columnHandles.get(field).getColumnType().getTypeParameters();
     Object[] parsedData = new Object[elemTypes.size()];
     Object[] nestedStructElements;
     for (int i = 0; i < elemTypes.size(); i++) {
-      if (elemTypes.get(i).getDisplayName().startsWith("row")) {
-        GenericInternalRow rowData = (GenericInternalRow) columnData[field];
-        String nestedStructData =
-            rowData.getStruct(i, elemTypes.get(i).getTypeParameters().size()).toString();
-        String[] nestedData =
-            nestedStructData.replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("\\s", "")
-                .split(",");
-        nestedStructElements = new Object[nestedData.length];
-        for (int j = 0; j < nestedData.length; j++) {
-          nestedStructElements[j] =
-              getStructElement(nestedData[j], elemTypes.get(i).getTypeParameters().get(j));
-        }
-        parsedData[i] = nestedStructElements;
-      } else {
-        GenericInternalRow rowData = (GenericInternalRow) columnData[field];
-        String nestedStructData = rowData.isNullAt(i) ? "null" : rowData.values()[i].toString();
-        parsedData[i] = getStructElement(nestedStructData, elemTypes.get(i));
+
+      switch (elemTypes.get(i).getTypeSignature().getBase()) {
+        case "row":
+          GenericInternalRow complexRowData = (GenericInternalRow) columnData[field];
+          String complexNestedStructData =
+              complexRowData.getStruct(i, elemTypes.get(i).getTypeParameters().size()).toString();
+          String[] nestedData =
+              complexNestedStructData.replaceAll("\\[", "").replaceAll("\\]", "").split(",");
+          nestedStructElements = new Object[nestedData.length];
+          for (int j = 0; j < nestedData.length; j++) {
+            nestedStructElements[j] =
+                getStructElement(nestedData[j], elemTypes.get(i).getTypeParameters().get(j));
+          }
+          parsedData[i] = nestedStructElements;
+          break;
+        case "array":
+          GenericInternalRow complexArrayData = (GenericInternalRow) columnData[field];
+          String complexNestedArrayData =
+              Arrays.deepToString(complexArrayData.getArray(field).array());
+          String[] arrayElements =
+              complexNestedArrayData.replaceAll("\\[", "").replaceAll("\\]", "").split(", ");
+          parsedData[i] = getArrayData(elemTypes.get(i).getTypeParameters().get(0), arrayElements);
+          break;
+
+        default:
+          GenericInternalRow rowData = (GenericInternalRow) columnData[field];
+          String nestedStructData = rowData.isNullAt(i) ? "null" : rowData.values()[i].toString();
+          parsedData[i] = getStructElement(nestedStructData, elemTypes.get(i));
       }
     }
 
@@ -239,55 +244,64 @@ public class CarbondataRecordCursor implements RecordCursor {
 
   private Object getData(int field) {
     String fieldValue = getFieldValue(field);
-    String[] data =
-        fieldValue.replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("\\s", "").split(",");
-    String arrDataType = columnHandles.get(field).getColumnType().getDisplayName();
-    if (arrDataType.contains("boolean")) {
-      Boolean[] boolResults = new Boolean[data.length];
-      for (int i = 0; i < boolResults.length; i++) {
-        boolResults[i] = checkNullValue(data[i]) ? null : Boolean.parseBoolean(data[i]);
-      }
-      return boolResults;
-    } else if (arrDataType.contains("long") || arrDataType.contains("bigint")) {
-      Long[] longResults = new Long[data.length];
-      for (int i = 0; i < longResults.length; i++) {
-        longResults[i] = checkNullValue(data[i]) ? null : Long.parseLong(data[i]);
-      }
-      return longResults;
-    } else if (arrDataType.contains("integer")) {
-      Integer[] IntResults = new Integer[data.length];
-      for (int i = 0; i < IntResults.length; i++) {
-        IntResults[i] = checkNullValue(data[i]) ? null : Integer.parseInt(data[i]);
-      }
-      return IntResults;
-    } else if (arrDataType.contains("double")) {
-      Double[] doubleResults = new Double[data.length];
-      for (int i = 0; i < doubleResults.length; i++) {
-        doubleResults[i] = checkNullValue(data[i]) ? null : Double.parseDouble(data[i]);
-      }
-      return doubleResults;
-    } else if (arrDataType.contains("float")) {
-      Float[] floatResults = new Float[data.length];
-      for (int i = 0; i < floatResults.length; i++) {
-        floatResults[i] = checkNullValue(data[i]) ? null : Float.parseFloat(data[i]);
-      }
-      return floatResults;
-    } else if (arrDataType.contains("decimal")) {
-      BigDecimal[] bigDecimalResults = new BigDecimal[data.length];
-      for (int i = 0; i < data.length; i++) {
-        bigDecimalResults[i] = checkNullValue(data[i]) ? null : new BigDecimal(data[i]);
-      }
-      return bigDecimalResults;
-    } else if (arrDataType.contains("timestamp")) {
-      Long[] timestampResults = new Long[data.length];
-      for (int i = 0; i < timestampResults.length; i++) {
-        timestampResults[i] = checkNullValue(data[i]) ?
-            null :
-            new Timestamp(Long.parseLong(data[i])).getTime() / 1000;
-      }
-      return timestampResults;
-    } else {
-      return data;
+    String[] data = fieldValue.replaceAll("\\[", "").replaceAll("\\]", "").split(",");
+
+    //For array datatype
+    Type arrDataType = columnHandles.get(field).getColumnType().getTypeParameters().get(0);
+    return getArrayData(arrDataType, data);
+  }
+
+  private Object getArrayData(Type arrDataType, String[] data) {
+
+    switch (arrDataType.getTypeSignature().getBase()) {
+      case "boolean":
+        Boolean[] boolResults = new Boolean[data.length];
+        for (int i = 0; i < boolResults.length; i++) {
+          boolResults[i] = checkNullValue(data[i]) ? null : Boolean.parseBoolean(data[i]);
+        }
+        return boolResults;
+      case "long":
+      case "bigint":
+        Long[] longResults = new Long[data.length];
+        for (int i = 0; i < longResults.length; i++) {
+          longResults[i] = checkNullValue(data[i]) ? null : Long.parseLong(data[i]);
+        }
+        return longResults;
+      case "integer":
+        Integer[] intResults = new Integer[data.length];
+        for (int i = 0; i < intResults.length; i++) {
+          intResults[i] = checkNullValue(data[i]) ? null : Integer.parseInt(data[i]);
+        }
+        return intResults;
+      case "double":
+        Double[] doubleResults = new Double[data.length];
+        for (int i = 0; i < doubleResults.length; i++) {
+          doubleResults[i] = checkNullValue(data[i]) ? null : Double.parseDouble(data[i]);
+        }
+        return doubleResults;
+      case "float":
+        Float[] floatResults = new Float[data.length];
+        for (int i = 0; i < floatResults.length; i++) {
+          floatResults[i] = checkNullValue(data[i]) ? null : Float.parseFloat(data[i]);
+        }
+        return floatResults;
+      case "decimal":
+        BigDecimal[] bigDecimalResults = new BigDecimal[data.length];
+        for (int i = 0; i < data.length; i++) {
+          bigDecimalResults[i] = checkNullValue(data[i]) ? null : new BigDecimal(data[i]);
+        }
+        return bigDecimalResults;
+      case "timestamp":
+        Long[] timestampResults = new Long[data.length];
+        for (int i = 0; i < timestampResults.length; i++) {
+          timestampResults[i] = checkNullValue(data[i]) ?
+              null :
+              new Timestamp(Long.parseLong(data[i])).getTime() / 1000;
+        }
+        return timestampResults;
+      default:
+        return data;
+
     }
   }
 

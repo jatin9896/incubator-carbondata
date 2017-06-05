@@ -28,6 +28,7 @@ import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.RecordSet;
+import com.facebook.presto.spi.block.ArrayBlock;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.IntArrayBlock;
@@ -160,74 +161,99 @@ public class CarbondataPageSource implements ConnectorPageSource {
   }
 
   private void writeObject(Object val, BlockBuilder output, Type type) {
-    Class arrTypeClass = val.getClass().getComponentType();
-    String arrClassName = arrTypeClass.getSimpleName();
     boolean[] isNull = checkNull(val);
 
-    if (type.getDisplayName().startsWith("row")) {
+    if (type.getTypeSignature().getBase().equals("row")) {
       Object[] data = (Object[]) val;
       List<Type> structElemTypes = type.getTypeParameters();
       Block[] dataBlock = new Block[structElemTypes.size()];
       for (int i = 0; i < structElemTypes.size(); i++) {
-        //boolean[] isElemNull = new boolean[] { isNull[i] };
-        dataBlock[i] = getElementBlock(output, structElemTypes.get(i), data[i]);
+        dataBlock[i] = getElementBlock(structElemTypes.get(i), data[i]);
       }
 
       type.writeObject(output, new InterleavedBlock(dataBlock));
 
     } else {
-      switch (arrClassName) {
-        case "Integer":
-          int[] intArray = getIntData((Integer[]) val);
-          type.writeObject(output, new IntArrayBlock(intArray.length, isNull, intArray));
-          break;
-        case "Long":
-          long[] longArray = getLongData((Long[]) val);
-          type.writeObject(output, new LongArrayBlock(longArray.length, isNull, longArray));
-          break;
-        case "String":
-          Slice[] stringSlices = getStringSlices(val);
-          type.writeObject(output, new SliceArrayBlock(stringSlices.length, stringSlices));
-          break;
-        case "Double":
-        case "Float":
-          Double[] data = (Double[]) val;
-          long[] doubleLongData = getLongDataForDouble(data);
-          type.writeObject(output,
-              new LongArrayBlock(doubleLongData.length, isNull, doubleLongData));
-          break;
-        case "Boolean":
-          Slice[] booleanSlices = getBooleanSlices(val);
-          type.writeObject(output, new SliceArrayBlock(booleanSlices.length, booleanSlices));
-          break;
-        case "":
-        default:
-          long[] longDecimalValues = getLongDataForDecimal((BigDecimal[]) val);
-          type.writeObject(output,
-              new LongArrayBlock(longDecimalValues.length, isNull, longDecimalValues));
-      }
+      Block arrayBlock = getArrayBlock(type, val, isNull);
+      type.writeObject(output, arrayBlock);
     }
   }
 
-  private Block getElementBlock(BlockBuilder output, Type structElemType, Object data) {
-    if (structElemType.getDisplayName().startsWith("row")) {
+  private Block getArrayBlock(Type type, Object val, boolean[] isNull) {
+
+    switch (type.getTypeSignature().getBase()) {
+      case "smallint":
+      case "integer":
+        int[] intArray = getIntData((Integer[]) val);
+        return new IntArrayBlock(intArray.length, isNull, intArray);
+      case "long":
+      case "timestamp":
+      case "bigint":
+        long[] longArray = getLongData((Long[]) val);
+        return new LongArrayBlock(longArray.length, isNull, longArray);
+      case "varchar":
+        Slice[] stringSlices = getStringSlices(val);
+        return new SliceArrayBlock(stringSlices.length, stringSlices);
+      case "double":
+      case "float":
+        Double[] data = (Double[]) val;
+        long[] doubleLongData = getLongDataForDouble(data);
+        return new LongArrayBlock(doubleLongData.length, isNull, doubleLongData);
+      case "boolean":
+        Slice[] booleanSlices = getBooleanSlices(val);
+        return new SliceArrayBlock(booleanSlices.length, booleanSlices);
+      case "decimal":
+        long[] longDecimalValues = getLongDataForDecimal((BigDecimal[]) val);
+        return new LongArrayBlock(longDecimalValues.length, isNull, longDecimalValues);
+      default:
+        return null;
+    }
+
+  }
+
+  private Block getElementBlock(Type structElemType, Object data) {
+    //Check for row inside a rowtype
+    if (structElemType.getTypeSignature().getBase().equals("row")) {
       int nStructElements = structElemType.getTypeParameters().size();
       Block[] structBlocks = new Block[nStructElements];
       Object[] structElements = (Object[]) data;
       for (int i = 0; i < nStructElements; i++) {
         structBlocks[i] =
-            getElementBlock(output, structElemType.getTypeParameters().get(i), structElements[i]);
+            getElementBlock(structElemType.getTypeParameters().get(i), structElements[i]);
       }
-      return new InterleavedBlock(structBlocks);
-     // structElemType.writeObject(output, new InterleavedBlock(structBlocks));
+      int blockSize = structBlocks[0].getPositionCount();
+      int[] offsets = new int[blockSize + 1];
+      for (int i = 1; i < offsets.length; i++) {
+        offsets[i] = i * nStructElements;
+      }
+      return new ArrayBlock(structBlocks[0].getPositionCount(), new boolean[blockSize], offsets,
+          new InterleavedBlock(structBlocks));
+
+    }
+    //Check for array inside a rowtype
+    else if (structElemType.getTypeSignature().getBase().equals("array")) {
+      Object[] structElements = (Object[]) data;
+      Type arrayElemType = structElemType.getTypeParameters().get(0);
+      boolean[] isNull = checkNull(structElements);
+      Block arrayBlock = getArrayBlock(arrayElemType, structElements, isNull);
+      int[] offsets = new int[arrayBlock.getPositionCount() + 1];
+      for (int i = 1; i < offsets.length; i++) {
+        offsets[i] = i * structElements.length;
+      }
+      return new ArrayBlock(1, new boolean[arrayBlock.getPositionCount()], offsets, arrayBlock);
+
     } else {
+
+      //Handling of primitive types inside a rowtype
       switch (structElemType.getDisplayName()) {
         case "integer":
           Integer[] intData = new Integer[] { (Integer) data };
-          return new IntArrayBlock(intData.length, new boolean[] { checkNullElement(data) }, getIntData(intData));
+          return new IntArrayBlock(intData.length, new boolean[] { checkNullElement(data) },
+              getIntData(intData));
         case "smallint":
           Short[] shortData = new Short[] { (Short) data };
-          return new ShortArrayBlock(shortData.length, new boolean[] { checkNullElement(data) }, getShortData(shortData));
+          return new ShortArrayBlock(shortData.length, new boolean[] { checkNullElement(data) },
+              getShortData(shortData));
         case "varchar":
           Slice slice = utf8Slice((String) data);
           return new SliceArrayBlock(1, new Slice[] { slice });
@@ -235,7 +261,8 @@ public class CarbondataPageSource implements ConnectorPageSource {
         case "bigint":
         case "long":
           Long[] longValue = new Long[] { (Long) data };
-          return new LongArrayBlock(longValue.length, new boolean[] { checkNullElement(data) }, getLongData(longValue));
+          return new LongArrayBlock(longValue.length, new boolean[] { checkNullElement(data) },
+              getLongData(longValue));
         case "boolean":
           Slice booleanData = utf8Slice(Boolean.toString((Boolean) data));
           return new SliceArrayBlock(1, new Slice[] { booleanData });
