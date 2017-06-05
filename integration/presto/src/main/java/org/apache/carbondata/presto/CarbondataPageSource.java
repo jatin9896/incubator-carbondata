@@ -302,9 +302,12 @@ public class CarbondataPageSource implements ConnectorPageSource {
           return new LongArrayBlock(doubleData.length, new boolean[] { checkNullElement(data) },
               getLongDataForDouble(doubleData));
         default:
-          BigDecimal[] longForDecimal = new BigDecimal[] { (BigDecimal) data };
+            BigDecimal decimalData=(BigDecimal)data;
+            Slice decimalSlice=utf8Slice(Decimals.toString(decimalData.unscaledValue(),decimalData.scale()));
+            return new SliceArrayBlock(1,new Slice[]{decimalSlice});
+         /* BigDecimal[] longForDecimal = new BigDecimal[] { (BigDecimal) data };
           return new LongArrayBlock(longForDecimal.length, new boolean[] { checkNullElement(data) },
-              getLongDataForDecimal(longForDecimal));
+              getLongDataForDecimal(longForDecimal));*/
       }
     }
   }
