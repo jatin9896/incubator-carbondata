@@ -184,7 +184,7 @@ public class CarbondataPageSource implements ConnectorPageSource {
 
   private Block getArrayBlock(Type type, Object val, boolean[] isNull) {
 
-    switch (type.getTypeSignature().getBase()) {
+    switch (type.getTypeParameters().get(0).getTypeSignature().getBase()) {
       case "smallint":
       case "integer":
         int[] intArray = getIntData((Integer[]) val);
@@ -209,7 +209,7 @@ public class CarbondataPageSource implements ConnectorPageSource {
         Slice[] decimalSlices = getDecimalSlices((BigDecimal[]) val);
         long[] bigDecimalLongValues = new long[decimalSlices.length];
         for(int i=0;i <decimalSlices.length; i++) {
-          bigDecimalLongValues[i] = parseLong((DecimalType) type, decimalSlices[i], 0, decimalSlices[i].length());
+          bigDecimalLongValues[i] = parseLong((DecimalType) type.getTypeParameters().get(0), decimalSlices[i], 0, decimalSlices[i].length());
         }
         return new LongArrayBlock(bigDecimalLongValues.length,
             isNull, bigDecimalLongValues);
