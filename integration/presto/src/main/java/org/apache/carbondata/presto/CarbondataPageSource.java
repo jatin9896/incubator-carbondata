@@ -17,13 +17,6 @@
 
 package org.apache.carbondata.presto;
 
-import com.facebook.presto.spi.*;
-import com.facebook.presto.spi.block.*;
-import com.facebook.presto.spi.type.DecimalType;
-import com.facebook.presto.spi.type.Decimals;
-import com.facebook.presto.spi.type.Type;
-import io.airlift.slice.Slice;
-
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -44,6 +37,7 @@ import com.facebook.presto.spi.block.LongArrayBlock;
 import com.facebook.presto.spi.block.ShortArrayBlock;
 import com.facebook.presto.spi.block.SliceArrayBlock;
 import com.facebook.presto.spi.type.DecimalType;
+import com.facebook.presto.spi.type.Decimals;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.slice.Slice;
 
@@ -110,64 +104,43 @@ public class CarbondataPageSource implements ConnectorPageSource {
           break;
         }
 
-                pageBuilder.declarePosition();
-                for (int column = 0; column < types.size(); column++) {
-                    BlockBuilder output = pageBuilder.getBlockBuilder(column);
-                    if (cursor.isNull(column)) {
-                        output.appendNull();
-                    } else {
-                        Type type = types.get(column);
-                        Class<?> javaType = type.getJavaType();
-                        String javaTypeName = javaType.getSimpleName();
-                        String base = type.getTypeSignature().getBase();
-                        switch (base) {
-                            case "varchar":
-                            case "decimal":
-                                Slice slice = cursor.getSlice(column);
-                                writeSlice(slice, type, output);
-                                break;
-                            case "row":
-                            case "array":
-                                Object val = cursor.getObject(column);
-                                writeObject(val, output, type);
-                                break;
-                            case "boolean":
-                                type.writeBoolean(output, cursor.getBoolean(column));
-                                break;
-                            case "long":
-                                type.writeLong(output, cursor.getLong(column));
-                                break;
-                            case "double":
-                                type.writeDouble(output, cursor.getDouble(column));
-                                break;
-                            default:
-                                type.writeObject(output, cursor.getObject(column));
-                        }
-                        /*switch (javaTypeName) {
-                            case "boolean":
-                                type.writeBoolean(output, cursor.getBoolean(column));
-                                break;
-                            case "long":
-                                type.writeLong(output, cursor.getLong(column));
-                                break;
-                            case "double":
-                                type.writeDouble(output, cursor.getDouble(column));
-                                break;
-                            case "Block":
-                                Object val = cursor.getObject(column);
-                                writeObject(val, output, type);
-                                break;
-                            case "Slice":
-                                Slice slice = cursor.getSlice(column);
-                                writeSlice(slice, type, output);
-                                break;
-                            default:
-                                type.writeObject(output, cursor.getObject(column));
-                        }*/
-                    }
-                }
+        pageBuilder.declarePosition();
+        for (int column = 0; column < types.size(); column++) {
+          BlockBuilder output = pageBuilder.getBlockBuilder(column);
+          if (cursor.isNull(column)) {
+            output.appendNull();
+          } else {
+            Type type = types.get(column);
+            Class<?> javaType = type.getJavaType();
+            String javaTypeName = javaType.getSimpleName();
+            String base = type.getTypeSignature().getBase();
+            switch (base) {
+              case "varchar":
+              case "decimal":
+                Slice slice = cursor.getSlice(column);
+                writeSlice(slice, type, output);
+                break;
+              case "row":
+              case "array":
+                Object val = cursor.getObject(column);
+                writeObject(val, output, type);
+                break;
+              case "boolean":
+                type.writeBoolean(output, cursor.getBoolean(column));
+                break;
+              case "long":
+                type.writeLong(output, cursor.getLong(column));
+                break;
+              case "double":
+                type.writeDouble(output, cursor.getDouble(column));
+                break;
+              default:
+                type.writeObject(output, cursor.getObject(column));
             }
+          }
         }
+      }
+    }
 
     // only return a page if the buffer is full or we are finishing
     if (pageBuilder.isEmpty() || (!closed && !pageBuilder.isFull())) {
@@ -233,12 +206,24 @@ public class CarbondataPageSource implements ConnectorPageSource {
         Slice[] booleanSlices = getBooleanSlices(val);
         return new SliceArrayBlock(booleanSlices.length, booleanSlices);
       case "decimal":
-        long[] longDecimalValues = getLongDataForDecimal((BigDecimal[]) val);
-        return new LongArrayBlock(longDecimalValues.length, isNull, longDecimalValues);
+        Slice[] decimalSlices = getDecimalSlices((BigDecimal[]) val);
+        long[] bigDecimalLongValues = new long[decimalSlices.length];
+        for(int i=0;i <decimalSlices.length; i++) {
+          bigDecimalLongValues[i] = parseLong((DecimalType) type, decimalSlices[i], 0, decimalSlices[i].length());
+        }
+        return new LongArrayBlock(bigDecimalLongValues.length,
+            isNull, bigDecimalLongValues);
       default:
         return null;
     }
+  }
 
+  private Slice[] getDecimalSlices(BigDecimal[] decimals) {
+  Slice[] decimalSlices = new Slice[decimals.length];
+    for (int i=0;i <decimals.length; i++) {
+      decimalSlices[i] = utf8Slice(Decimals.toString(decimals[i].unscaledValue(), decimals[i].scale()));
+  }
+  return decimalSlices;
   }
 
   private Block getElementBlock(Type structElemType, Object data) {
@@ -302,12 +287,14 @@ public class CarbondataPageSource implements ConnectorPageSource {
           return new LongArrayBlock(doubleData.length, new boolean[] { checkNullElement(data) },
               getLongDataForDouble(doubleData));
         default:
-            BigDecimal decimalData=(BigDecimal)data;
-            Slice decimalSlice=utf8Slice(Decimals.toString(decimalData.unscaledValue(),decimalData.scale()));
-            return new SliceArrayBlock(1,new Slice[]{decimalSlice});
-         /* BigDecimal[] longForDecimal = new BigDecimal[] { (BigDecimal) data };
-          return new LongArrayBlock(longForDecimal.length, new boolean[] { checkNullElement(data) },
-              getLongDataForDecimal(longForDecimal));*/
+          BigDecimal decimalData = (BigDecimal) data;
+          Slice decimalSlice =
+              utf8Slice(Decimals.toString(decimalData.unscaledValue(), decimalData.scale()));
+          long[] bigDecimalLongValues = new long[] {
+              parseLong((DecimalType) structElemType, decimalSlice, 0, decimalSlice.length()) };
+          return new LongArrayBlock(bigDecimalLongValues.length,
+              new boolean[] { checkNullElement(data) }, bigDecimalLongValues);
+
       }
     }
   }
