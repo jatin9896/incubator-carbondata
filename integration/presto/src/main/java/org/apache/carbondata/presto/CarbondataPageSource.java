@@ -17,6 +17,13 @@
 
 package org.apache.carbondata.presto;
 
+import com.facebook.presto.spi.*;
+import com.facebook.presto.spi.block.*;
+import com.facebook.presto.spi.type.DecimalType;
+import com.facebook.presto.spi.type.Decimals;
+import com.facebook.presto.spi.type.Type;
+import io.airlift.slice.Slice;
+
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -103,41 +110,64 @@ public class CarbondataPageSource implements ConnectorPageSource {
           break;
         }
 
-        pageBuilder.declarePosition();
-        for (int column = 0; column < types.size(); column++) {
-          BlockBuilder output = pageBuilder.getBlockBuilder(column);
-          if (cursor.isNull(column)) {
-            output.appendNull();
-          } else {
-            Type type = types.get(column);
-            Class<?> javaType = type.getJavaType();
-            String javaTypeName = javaType.getSimpleName();
-
-            switch (javaTypeName) {
-              case "boolean":
-                type.writeBoolean(output, cursor.getBoolean(column));
-                break;
-              case "long":
-                type.writeLong(output, cursor.getLong(column));
-                break;
-              case "double":
-                type.writeDouble(output, cursor.getDouble(column));
-                break;
-              case "Block":
-                Object val = cursor.getObject(column);
-                writeObject(val, output, type);
-                break;
-              case "Slice":
-                Slice slice = cursor.getSlice(column);
-                writeSlice(slice, type, output);
-                break;
-              default:
-                type.writeObject(output, cursor.getObject(column));
+                pageBuilder.declarePosition();
+                for (int column = 0; column < types.size(); column++) {
+                    BlockBuilder output = pageBuilder.getBlockBuilder(column);
+                    if (cursor.isNull(column)) {
+                        output.appendNull();
+                    } else {
+                        Type type = types.get(column);
+                        Class<?> javaType = type.getJavaType();
+                        String javaTypeName = javaType.getSimpleName();
+                        String base = type.getTypeSignature().getBase();
+                        switch (base) {
+                            case "varchar":
+                            case "decimal":
+                                Slice slice = cursor.getSlice(column);
+                                writeSlice(slice, type, output);
+                                break;
+                            case "row":
+                            case "array":
+                                Object val = cursor.getObject(column);
+                                writeObject(val, output, type);
+                                break;
+                            case "boolean":
+                                type.writeBoolean(output, cursor.getBoolean(column));
+                                break;
+                            case "long":
+                                type.writeLong(output, cursor.getLong(column));
+                                break;
+                            case "double":
+                                type.writeDouble(output, cursor.getDouble(column));
+                                break;
+                            default:
+                                type.writeObject(output, cursor.getObject(column));
+                        }
+                        /*switch (javaTypeName) {
+                            case "boolean":
+                                type.writeBoolean(output, cursor.getBoolean(column));
+                                break;
+                            case "long":
+                                type.writeLong(output, cursor.getLong(column));
+                                break;
+                            case "double":
+                                type.writeDouble(output, cursor.getDouble(column));
+                                break;
+                            case "Block":
+                                Object val = cursor.getObject(column);
+                                writeObject(val, output, type);
+                                break;
+                            case "Slice":
+                                Slice slice = cursor.getSlice(column);
+                                writeSlice(slice, type, output);
+                                break;
+                            default:
+                                type.writeObject(output, cursor.getObject(column));
+                        }*/
+                    }
+                }
             }
-          }
         }
-      }
-    }
 
     // only return a page if the buffer is full or we are finishing
     if (pageBuilder.isEmpty() || (!closed && !pageBuilder.isFull())) {
