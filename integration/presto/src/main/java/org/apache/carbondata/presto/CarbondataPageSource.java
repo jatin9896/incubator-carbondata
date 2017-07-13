@@ -27,7 +27,10 @@ import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.RecordSet;
+import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.block.LazyBlock;
+import com.facebook.presto.spi.block.LazyBlockLoader;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.slice.Slice;
@@ -51,41 +54,52 @@ public class CarbondataPageSource implements ConnectorPageSource {
   private final PageBuilder pageBuilder;
   private boolean closed;
   private final char[] buffer = new char[100];
+ /* long startTime = 0;
+  long stopTime = 0;*/
+  private Block[] blocks;
 
-  public CarbondataPageSource(RecordSet recordSet)
-  {
+  public CarbondataPageSource(RecordSet recordSet) {
     this(requireNonNull(recordSet, "recordSet is null").getColumnTypes(), recordSet.cursor());
   }
 
-  public CarbondataPageSource(List<Type> types, RecordCursor cursor)
-  {
+  public CarbondataPageSource(List<Type> types, RecordCursor cursor) {
     this.cursor = requireNonNull(cursor, "cursor is null");
     this.types = unmodifiableList(new ArrayList<>(requireNonNull(types, "types is null")));
     this.pageBuilder = new PageBuilder(this.types);
+    this.blocks = new Block[types.size()];
   }
 
-  public RecordCursor getCursor()
-  {
+  public RecordCursor getCursor() {
     return cursor;
   }
 
-  @Override public long getTotalBytes() {
+  @Override
+  public long getTotalBytes() {
     return cursor.getTotalBytes();
   }
 
-  @Override public long getCompletedBytes() {
+  @Override
+  public long getCompletedBytes() {
     return cursor.getCompletedBytes();
   }
 
-  @Override public long getReadTimeNanos() {
+  @Override
+  public long getReadTimeNanos() {
     return cursor.getReadTimeNanos();
   }
 
-  @Override public boolean isFinished() {
+  @Override
+  public boolean isFinished() {
     return closed && pageBuilder.isEmpty();
   }
 
-  @Override public Page getNextPage() {
+  @Override
+  public Page getNextPage() {
+
+ /*   startTime = System.currentTimeMillis();
+    if (stopTime != 0) {
+      //      System.out.println("carbondataPageSource : ---------> Time for get next page " + (startTime - stopTime));
+    }*/
     if (!closed) {
       int i;
       for (i = 0; i < ROWS_PER_REQUEST; i++) {
@@ -113,8 +127,7 @@ public class CarbondataPageSource implements ConnectorPageSource {
               type.writeDouble(output, cursor.getDouble(column));
             } else if (javaType == Slice.class) {
               Slice slice = cursor.getSlice(column);
-              if(type instanceof  DecimalType)
-              {
+              if (type instanceof DecimalType) {
                 if (isShortDecimal(type)) {
                   type.writeLong(output, parseLong((DecimalType) type, slice, 0, slice.length()));
                 } else {
@@ -127,6 +140,7 @@ public class CarbondataPageSource implements ConnectorPageSource {
               type.writeObject(output, cursor.getObject(column));
             }
           }
+          blocks[column] = new LazyBlock(output.getPositionCount(), new CarbonBlockLoader(output.build(), types.get(column)))/*output.build()*/;
         }
       }
     }
@@ -135,36 +149,36 @@ public class CarbondataPageSource implements ConnectorPageSource {
     if (pageBuilder.isEmpty() || (!closed && !pageBuilder.isFull())) {
       return null;
     }
-    Page page = pageBuilder.build();
+    Page page = new Page(blocks[0].getPositionCount(), blocks)/*pageBuilder.build()*/;
     pageBuilder.reset();
+    //stopTime = System.currentTimeMillis();
     return page;
- }
+  }
 
-  @Override public long getSystemMemoryUsage() {
+  @Override
+  public long getSystemMemoryUsage() {
     return cursor.getSystemMemoryUsage() + pageBuilder.getSizeInBytes();
   }
 
-  @Override public void close() throws IOException {
+  @Override
+  public void close() throws IOException {
     closed = true;
     cursor.close();
 
   }
 
-  private long parseLong(DecimalType type, Slice slice, int offset, int length)
-  {
+  private long parseLong(DecimalType type, Slice slice, int offset, int length) {
     BigDecimal decimal = parseBigDecimal(type, slice, offset, length);
     return decimal.unscaledValue().longValue();
   }
 
 
-  private Slice parseSlice(DecimalType type, Slice slice, int offset, int length)
-  {
+  private Slice parseSlice(DecimalType type, Slice slice, int offset, int length) {
     BigDecimal decimal = parseBigDecimal(type, slice, offset, length);
     return encodeUnscaledValue(decimal.unscaledValue());
   }
 
-  private BigDecimal parseBigDecimal(DecimalType type, Slice slice, int offset, int length)
-  {
+  private BigDecimal parseBigDecimal(DecimalType type, Slice slice, int offset, int length) {
     checkArgument(length < buffer.length);
     for (int i = 0; i < length; i++) {
       buffer[i] = (char) slice.getByte(offset + i);
@@ -174,5 +188,28 @@ public class CarbondataPageSource implements ConnectorPageSource {
     decimal = decimal.setScale(type.getScale(), HALF_UP);
     checkState(decimal.precision() <= type.getPrecision(), "Read decimal precision larger than column precision");
     return decimal;
+  }
+
+
+  private final class CarbonBlockLoader
+      implements LazyBlockLoader<LazyBlock> {
+    private boolean loaded;
+    private Block dataBlock;
+    private Type type;
+
+    public CarbonBlockLoader(Block dataBlock, Type type) {
+      this.dataBlock = dataBlock;
+      this.type = type;
+    }
+
+    @Override
+    public void load(LazyBlock block) {
+
+      if (loaded) {
+        return;
+      }
+      block.setBlock(dataBlock);
+      loaded = true;
+    }
   }
 }

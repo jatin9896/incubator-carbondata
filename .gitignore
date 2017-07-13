@@ -16,3 +16,5 @@ target/
 .classpath
 metastore_db/
 derby.log
+/integration/presto/data/
+/integration/presto/test/
