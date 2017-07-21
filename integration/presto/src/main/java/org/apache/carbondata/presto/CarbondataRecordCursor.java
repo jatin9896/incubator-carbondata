@@ -32,7 +32,7 @@ import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import org.apache.carbondata.common.CarbonIterator;
 import org.apache.carbondata.hadoop.readsupport.CarbonReadSupport;
-
+import org.apache.carbondata.presto.impl.PrestoDictionaryDecodeReadSupport;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -58,13 +58,13 @@ public class CarbondataRecordCursor implements RecordCursor {
   private List<String> fields;
   private CarbondataSplit split;
   private CarbonIterator<Object[]> rowCursor;
-  private CarbonReadSupport<Object[]> readSupport;
+  private PrestoDictionaryDecodeReadSupport<Object[]> readSupport;
 
   private long totalBytes;
   private long nanoStart;
   private long nanoEnd;
 
-  public CarbondataRecordCursor(CarbonReadSupport<Object[]> readSupport,
+  public CarbondataRecordCursor(PrestoDictionaryDecodeReadSupport<Object[]> readSupport,
       CarbonIterator<Object[]> carbonIterator, List<CarbondataColumnHandle> columnHandles,
       CarbondataSplit split) {
     this.rowCursor = carbonIterator;

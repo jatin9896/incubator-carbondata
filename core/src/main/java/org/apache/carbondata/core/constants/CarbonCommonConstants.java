@@ -641,6 +641,12 @@ public final class CarbonCommonConstants {
    */
   public static final String TABLEUPDATESTATUS_FILENAME = "tableupdatestatus";
   /**
+   * Default batch for data read in Columnar format
+   */
+
+   public static final String COLUMNAR_DATA_READ_BATCH_SIZE = "4096";
+
+  /**
    * The batch size of records which returns to client.
    */
   @CarbonProperty

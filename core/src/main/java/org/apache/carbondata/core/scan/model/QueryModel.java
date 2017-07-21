@@ -97,6 +97,8 @@ public class QueryModel implements Serializable {
 
   private boolean vectorReader;
 
+  private boolean columnCollector;
+
   /**
    * Invalid table blocks, which need to be removed from
    * memory, invalid blocks can be segment which are deleted
@@ -359,5 +361,13 @@ public class QueryModel implements Serializable {
 
   public Map<String,UpdateVO>  getInvalidBlockVOForSegmentId() {
     return  invalidSegmentBlockIdMap;
+  }
+
+  public boolean isColumnCollector() {
+    return columnCollector;
+  }
+
+  public void setColumnCollector(boolean columnCollector) {
+    this.columnCollector = columnCollector;
   }
 }

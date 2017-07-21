@@ -214,6 +214,10 @@ public class BlockExecutionInfo {
   private boolean isRestructuredBlock;
 
   /**
+   * whether it needs to read data in columnar format
+   */
+  private boolean columnCollector;
+  /**
    * absolute table identifier
    */
   private AbsoluteTableIdentifier absoluteTableIdentifier;
@@ -658,5 +662,13 @@ public class BlockExecutionInfo {
    */
   public void setDeletedRecordsMap(Map<String, DeleteDeltaVo> deletedRecordsMap) {
     this.deletedRecordsMap = deletedRecordsMap;
+  }
+
+  public boolean isColumnCollector() {
+    return columnCollector;
+  }
+
+  public void setColumnCollector(boolean columnCollector) {
+    this.columnCollector = columnCollector;
   }
 }

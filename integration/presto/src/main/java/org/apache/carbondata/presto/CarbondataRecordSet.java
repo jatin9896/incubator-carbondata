@@ -17,30 +17,35 @@
 
 package org.apache.carbondata.presto;
 
-import com.facebook.presto.spi.*;
-import com.facebook.presto.spi.predicate.TupleDomain;
-import com.facebook.presto.spi.type.Type;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.apache.carbondata.common.CarbonIterator;
 import org.apache.carbondata.core.datastore.block.BlockletInfos;
 import org.apache.carbondata.core.datastore.block.TableBlockInfo;
 import org.apache.carbondata.core.metadata.ColumnarFormatVersion;
 import org.apache.carbondata.core.metadata.schema.table.CarbonTable;
+import org.apache.carbondata.core.scan.executor.PrestoQueryExecutorFactory;
 import org.apache.carbondata.core.scan.executor.QueryExecutor;
-import org.apache.carbondata.core.scan.executor.QueryExecutorFactory;
 import org.apache.carbondata.core.scan.executor.exception.QueryExecutionException;
 import org.apache.carbondata.core.scan.expression.Expression;
 import org.apache.carbondata.core.scan.model.QueryModel;
 import org.apache.carbondata.core.scan.result.BatchResult;
 import org.apache.carbondata.core.scan.result.iterator.ChunkRowIterator;
-import org.apache.carbondata.hadoop.readsupport.CarbonReadSupport;
-import org.apache.carbondata.hadoop.readsupport.impl.DictionaryDecodeReadSupport;
-//import org.apache.carbondata.hadoop.readsupport.impl.DictionaryDecodedReadSupportImpl;
+import org.apache.carbondata.presto.impl.PrestoDictionaryDecodeReadSupport;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
+import com.facebook.presto.spi.ColumnHandle;
+import com.facebook.presto.spi.ConnectorSession;
+import com.facebook.presto.spi.ConnectorSplit;
+import com.facebook.presto.spi.RecordCursor;
+import com.facebook.presto.spi.RecordSet;
+import com.facebook.presto.spi.predicate.TupleDomain;
+import com.facebook.presto.spi.type.Type;
 
 import static org.apache.carbondata.presto.Types.checkType;
+
+//import org.apache.carbondata.hadoop.readsupport.impl.DictionaryDecodedReadSupportImpl;
 
 public class CarbondataRecordSet implements RecordSet {
 
@@ -53,7 +58,7 @@ public class CarbondataRecordSet implements RecordSet {
   private List<CarbondataColumnHandle> columns;
   private QueryExecutor queryExecutor;
 
-  private CarbonReadSupport<Object[]> readSupport;
+  private PrestoDictionaryDecodeReadSupport readSupport;
 
   public CarbondataRecordSet(CarbonTable carbonTable, ConnectorSession session,
       ConnectorSplit split, List<CarbondataColumnHandle> columns, QueryModel queryModel) {
@@ -63,7 +68,7 @@ public class CarbondataRecordSet implements RecordSet {
     this.rebuildConstraints = this.split.getRebuildConstraints();
     this.queryModel = queryModel;
     this.columns = columns;
-    this.readSupport = new DictionaryDecodeReadSupport();
+    this.readSupport = new PrestoDictionaryDecodeReadSupport<>();
   }
 
   //todo support later
@@ -84,12 +89,14 @@ public class CarbondataRecordSet implements RecordSet {
     tableBlockInfoList.add(new TableBlockInfo(split.getLocalInputSplit().getPath().toString(),
         split.getLocalInputSplit().getStart(), split.getLocalInputSplit().getSegmentId(),
         split.getLocalInputSplit().getLocations().toArray(new String[0]),
-        split.getLocalInputSplit().getLength(),new BlockletInfos(),
+        split.getLocalInputSplit().getLength(), new BlockletInfos(),
         //blockletInfos,
-        ColumnarFormatVersion.valueOf(split.getLocalInputSplit().getVersion()),null));
+        ColumnarFormatVersion.valueOf(split.getLocalInputSplit().getVersion()), null));
+
+    queryModel.setColumnCollector(true);
     queryModel.setTableBlockInfos(tableBlockInfoList);
 
-    queryExecutor = QueryExecutorFactory.getQueryExecutor(queryModel);
+    queryExecutor = PrestoQueryExecutorFactory.getQueryExecutor(queryModel);
 
     //queryModel.setQueryId(queryModel.getQueryId() + "_" + split.getLocalInputSplit().getSegmentId());
     try {
@@ -100,10 +107,9 @@ public class CarbondataRecordSet implements RecordSet {
       RecordCursor rc = new CarbondataRecordCursor(readSupport, carbonIterator, columns, split);
       return rc;
     } catch (QueryExecutionException e) {
-       throw new RuntimeException(e.getMessage(), e);
-   } catch (Exception ex) {
+      throw new RuntimeException(e.getMessage(), e);
+    } catch (Exception ex) {
       throw new RuntimeException(ex.getMessage(), ex);
     }
   }
 }
-
