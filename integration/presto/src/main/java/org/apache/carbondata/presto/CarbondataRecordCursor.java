@@ -28,6 +28,7 @@ import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 
 import org.apache.carbondata.common.CarbonIterator;
+import org.apache.carbondata.core.scan.result.BatchResult;
 import org.apache.carbondata.presto.impl.PrestoDictionaryDecodeReadSupport;
 
 import java.math.BigDecimal;
@@ -53,7 +54,10 @@ public class CarbondataRecordCursor implements RecordCursor {
 
   private List<String> fields;
   private CarbondataSplit split;
-  private CarbonIterator<Object[]> rowCursor;
+
+  private CarbonIterator<BatchResult> columnCursor;
+
+
   private PrestoDictionaryDecodeReadSupport<Object[]> readSupport;
 
   private long totalBytes;
@@ -61,9 +65,9 @@ public class CarbondataRecordCursor implements RecordCursor {
   private long nanoEnd;
 
   public CarbondataRecordCursor(PrestoDictionaryDecodeReadSupport<Object[]> readSupport,
-      CarbonIterator<Object[]> carbonIterator, List<CarbondataColumnHandle> columnHandles,
+      CarbonIterator<BatchResult> carbonIterator, List<CarbondataColumnHandle> columnHandles,
       CarbondataSplit split) {
-    this.rowCursor = carbonIterator;
+    this.columnCursor = carbonIterator;
     this.columnHandles = columnHandles;
     this.readSupport = readSupport;
     this.totalBytes = 0;
@@ -96,10 +100,13 @@ public class CarbondataRecordCursor implements RecordCursor {
       nanoStart = System.nanoTime();
     }
 
-    if (rowCursor.hasNext()) {
-      Object[] columns = readSupport.readRow(rowCursor.next());
+    if (columnCursor.hasNext()) {
+      BatchResult columnBatch =  columnCursor.next();
+      List<Object[]> columnData = columnBatch.getRows();
+
+      /*
       fields = new ArrayList<String>();
-      if(columns != null && columns.length > 0)
+      if(columnData != null && columnData.size() > 0)
       {
         for(Object value : columns){
           if(value != null )
@@ -111,6 +118,7 @@ public class CarbondataRecordCursor implements RecordCursor {
         }
       }
       totalBytes += columns.length;
+      */
       return true;
     }
     return false;
@@ -199,4 +207,13 @@ public class CarbondataRecordCursor implements RecordCursor {
 
     //todo  delete cache from readSupport
   }
+
+  public CarbonIterator<BatchResult> getColumnCursor() {
+    return columnCursor;
+  }
+
+  public PrestoDictionaryDecodeReadSupport<Object[]> getReadSupport() {
+    return readSupport;
+  }
+
 }

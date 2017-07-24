@@ -64,18 +64,30 @@ class PrestoDictionaryDecodeReadSupport[T] extends CarbonReadSupport[T] {
   }
 
   def readRow(data: Array[AnyRef]): T = {
-    var i: Int = 0
-    while (i < dictionaries.length) {
-      {
-        if (Try(data(i).toString.toInt).toOption.isDefined) {
-          if (dictionaries(i) != null) {
-            data(i) = dictionaries(i).getDictionaryValueForKey(data(i).asInstanceOf[Int])
+    var i = 0
+    if(dictionaries != null && dictionaries.length > 0) {
+      while (i < dictionaries.length) {
+        {
+          if (Try(data(i).toString.toInt).toOption.isDefined) {
+            if (dictionaries(i) != null) {
+              data(i) = dictionaries(i).getDictionaryValueForKey(data(i).asInstanceOf[Int])
+            }
           }
+          { i += 1; i - 1 }
         }
-        { i += 1; i - 1 }
       }
     }
+
     data.asInstanceOf[T]
+  }
+
+  def convertColumn(data: Array[AnyRef], columnNo : Int): T = {
+    val convertedData: Any = if (Option(dictionaries(columnNo)).isDefined) {
+      data.map { x => dictionaries(columnNo).getDictionaryValueForKey(x.asInstanceOf[Int]) }
+    } else {
+      data
+    }
+    convertedData.asInstanceOf[T]
   }
 
   /**

@@ -93,8 +93,12 @@ public class ColumnBasedResultCollector extends AbstractScannedResultCollector {
 
     int noOfColumns=queryDimensions.length + queryMeasures.length;
 
-    Object[][] matrix=new Object[noOfColumns][batchSize];
+    int resultSize = scannedResult.numberOfOutputRows();
+    if(resultSize < batchSize) {
+      batchSize = resultSize;
+    }
 
+    Object[][] matrix=new Object[noOfColumns][batchSize];
     // scan the record and add to list
     List<Object[]> listBasedResult = new ArrayList<>(batchSize);
     int rowCounter = 0;
