@@ -69,7 +69,7 @@ class PrestoDictionaryDecodeReadSupport[T] extends CarbonReadSupport[T] {
    * column involved during decode, to facilitate LRU cache policy if memory
    * threshold is reached
    */
-  def close() {
+override def close() {
     dictionaries.foreach(dictionary => if (Option(dictionary).isDefined) {
       CarbonUtil.clearDictionaryCache(dictionary)
     })
