@@ -6,6 +6,7 @@ import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.*;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.Slice;
 import org.apache.carbondata.core.metadata.datatype.DataType;
 import org.apache.carbondata.core.metadata.schema.table.CarbonTable;
@@ -17,13 +18,16 @@ import org.apache.carbondata.core.scan.expression.logical.AndExpression;
 import org.apache.carbondata.core.scan.expression.logical.OrExpression;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
 public class CarbondataFilterUtil {
-
+    private static Map<String,Expression> filterMap= new HashMap<>();
     private static DataType Spi2CarbondataTypeMapper(CarbondataColumnHandle carbondataColumnHandle) {
         Type colType = carbondataColumnHandle.getColumnType();
         if (colType == BooleanType.BOOLEAN) return DataType.BOOLEAN;
@@ -169,6 +173,7 @@ public class CarbondataFilterUtil {
         return finalFilters;
     }
 
+
     private static Object ConvertDataByType(Object rawdata, Type type) {
         if (type.equals(IntegerType.INTEGER)) return new Integer((rawdata.toString()));
         else if (type.equals(BigintType.BIGINT)) return (Long) rawdata;
@@ -176,5 +181,13 @@ public class CarbondataFilterUtil {
         else if (type.equals(BooleanType.BOOLEAN)) return (Boolean) (rawdata);
 
         return rawdata;
+    }
+
+    public static Expression getFilters(String key) {
+        return filterMap.get(key);
+    }
+
+    public static void setFilter(String tableName, Expression filter) {
+        filterMap.put(tableName,filter);
     }
 }

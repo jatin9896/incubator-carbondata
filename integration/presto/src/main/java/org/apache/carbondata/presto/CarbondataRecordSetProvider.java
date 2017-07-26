@@ -116,7 +116,7 @@ public class CarbondataRecordSetProvider implements ConnectorRecordSetProvider {
   private void fillFilter2QueryModel(QueryModel queryModel,
       TupleDomain<ColumnHandle> originalConstraint, CarbonTable carbonTable) {
 
-    Expression finalFilters=CarbondataFilterUtil.parseFilterExpression(originalConstraint,carbonTable);
+    Expression finalFilters=CarbondataFilterUtil.getFilters(carbonTable.getFactTableName());
 
     // todo set into QueryModel
     CarbonInputFormatUtil.processFilterExpression(finalFilters, carbonTable);

@@ -98,6 +98,7 @@ public class CarbondataSplitManager implements ConnectorSplitManager {
 
     CarbonTableCacheModel cache = carbonTableReader.getCarbonCache(key);
     Expression filters = CarbondataFilterUtil.parseFilterExpression(layoutHandle.getConstraint(), cache.carbonTable);
+    CarbondataFilterUtil.setFilter(layoutHandle.getTable().getSchemaTableName().getTableName(),filters);
     if (cache != null) {
       try {
         List<CarbonLocalInputSplit> splits = carbonTableReader.getInputSplits2(cache, filters);
