@@ -74,6 +74,8 @@ public class ColumnBasedResultCollector extends AbstractScannedResultCollector {
 
   protected Map<Integer, GenericQueryType> comlexDimensionInfoMap;
 
+  protected int numberOfBatches = 0;
+
   public ColumnBasedResultCollector(BlockExecutionInfo blockExecutionInfos) {
     super(blockExecutionInfos);
     queryDimensions = tableBlockExecutionInfos.getQueryDimensions();
@@ -97,6 +99,8 @@ public class ColumnBasedResultCollector extends AbstractScannedResultCollector {
     if(resultSize < batchSize) {
       batchSize = resultSize;
     }
+
+    numberOfBatches++;
 
     Object[][] matrix=new Object[noOfColumns][batchSize];
     // scan the record and add to list
@@ -127,7 +131,7 @@ public class ColumnBasedResultCollector extends AbstractScannedResultCollector {
       }
       fillMeasureData(scannedResult, row);
 
-      for(int i=0; i<noOfColumns;i++){
+      for(int i=0; i<noOfColumns;i++) {
         matrix[i][rowCounter]=row[i];
       }
 
@@ -135,6 +139,17 @@ public class ColumnBasedResultCollector extends AbstractScannedResultCollector {
       // listBasedResult.add(result);
       rowCounter++;
     }
+    System.out.println("############## rowCounter " + rowCounter);
+    System.out.println("############## number of batches " + numberOfBatches + " " + batchSize);
+    if(noOfColumns == 0){
+      if(rowCounter < batchSize) {
+        matrix=new Object[1][rowCounter];
+      } else {
+        matrix=new Object[1][batchSize];
+      }
+
+    }
+
     // List<Object[]> columnarData = new ArrayList<>(matrix);
     ArrayList<Object[]> columnarData = new ArrayList<>(Arrays.asList(matrix));
 
