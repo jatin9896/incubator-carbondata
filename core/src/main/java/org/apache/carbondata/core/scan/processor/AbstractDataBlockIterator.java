@@ -209,6 +209,8 @@ public abstract class AbstractDataBlockIterator extends CarbonIterator<List<Obje
 
   public abstract void processNextBatch(CarbonColumnarBatch columnarBatch);
 
+  public abstract List<Object[]>  processNextColumnBatch();
+
   /**
    * Close the resources
    */

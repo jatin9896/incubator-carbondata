@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.carbondata.common.CarbonIterator;
+import org.apache.carbondata.core.constants.CarbonCommonConstants;
 import org.apache.carbondata.core.datastore.block.BlockletInfos;
 import org.apache.carbondata.core.datastore.block.TableBlockInfo;
 import org.apache.carbondata.core.metadata.ColumnarFormatVersion;
@@ -33,6 +34,7 @@ import org.apache.carbondata.core.scan.expression.Expression;
 import org.apache.carbondata.core.scan.model.QueryModel;
 import org.apache.carbondata.core.scan.result.BatchResult;
 import org.apache.carbondata.core.scan.result.iterator.ChunkRowIterator;
+import org.apache.carbondata.core.util.CarbonProperties;
 import org.apache.carbondata.presto.impl.PrestoDictionaryDecodeReadSupport;
 
 import com.facebook.presto.spi.ColumnHandle;
@@ -98,11 +100,17 @@ public class CarbondataRecordSet implements RecordSet {
 
     queryExecutor = PrestoQueryExecutorFactory.getQueryExecutor(queryModel);
 
+    CarbonProperties.getInstance()
+     .addProperty("carbon.detail.batch.size", "4096");
+
     //queryModel.setQueryId(queryModel.getQueryId() + "_" + split.getLocalInputSplit().getSegmentId());
     try {
       readSupport
           .initialize(queryModel.getProjectionColumns(), queryModel.getAbsoluteTableIdentifier());
+      long startTime = System.currentTimeMillis();
       CarbonIterator<BatchResult> carbonIterator = queryExecutor.execute(queryModel);
+      System.out.println("Time taken to execute the query on CarbonData " +
+          (System.currentTimeMillis() - startTime));
       RecordCursor rc = new CarbondataRecordCursor(readSupport, carbonIterator, columns, split);
       return rc;
     } catch (QueryExecutionException e) {

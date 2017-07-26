@@ -68,4 +68,16 @@ public class DataBlockIteratorImpl extends AbstractDataBlockIterator {
     }
   }
 
+  @Override public List<Object[]>  processNextColumnBatch() {
+    List<Object[]> collectedResult ;
+    batchSize = Integer.parseInt(COLUMNAR_DATA_READ_BATCH_SIZE);
+    if (updateScanner()) {
+      collectedResult = this.scannerResultAggregator.collectData(scannedResult, batchSize);
+    } else {
+      collectedResult = new ArrayList<>();
+    }
+    return collectedResult;
+
+  }
+
 }

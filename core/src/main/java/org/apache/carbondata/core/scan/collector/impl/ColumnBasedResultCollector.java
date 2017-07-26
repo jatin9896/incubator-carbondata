@@ -102,15 +102,12 @@ public class ColumnBasedResultCollector extends AbstractScannedResultCollector {
     Object[][] matrix = new Object[noOfColumns][batchSize];
     numberOfBatches++;
 
-    Object[][] matrix=new Object[noOfColumns][batchSize];
     // scan the record and add to list
-    List<Object[]> listBasedResult = new ArrayList<>(batchSize);
     int rowCounter = 0;
     int[] surrogateResult;
     byte[][] noDictionaryKeys;
     byte[][] complexTypeKeyArray;
     while (scannedResult.hasNext() && rowCounter < batchSize) {
-      int[] rowData = new int[queryDimensions.length + queryMeasures.length];
       Object[] row = new Object[queryDimensions.length + queryMeasures.length];
       if (isDimensionExists) {
         surrogateResult = scannedResult.getDictionaryKeyIntegerArray();
@@ -134,13 +131,10 @@ public class ColumnBasedResultCollector extends AbstractScannedResultCollector {
       for (int i = 0; i < noOfColumns; i++) {
         matrix[i][rowCounter] = row[i];
       }
-
-      //  Object result = (Object)matrix;
-      // listBasedResult.add(result);
       rowCounter++;
     }
-    ArrayList<Object[]> columnarData = new ArrayList<>();
 
+    ArrayList<Object[]> columnarData;
     if (rowCounter < batchSize) {
       Object[][] matrix_temp = new Object[noOfColumns][rowCounter];
       for (int i = 0; i < noOfColumns; i++) {
@@ -150,24 +144,15 @@ public class ColumnBasedResultCollector extends AbstractScannedResultCollector {
       }
       columnarData = new ArrayList<>(Arrays.asList(matrix_temp));
     } else {
-      // List<Object[]> columnarData = new ArrayList<>(matrix);
       columnarData = new ArrayList<>(Arrays.asList(matrix));
     }
-    System.out.println("############## rowCounter " + rowCounter);
-    System.out.println("############## number of batches " + numberOfBatches + " " + batchSize);
+
     if(noOfColumns == 0){
-      if(rowCounter < batchSize) {
-        matrix=new Object[1][rowCounter];
-      } else {
-        matrix=new Object[1][batchSize];
-      }
-
+      matrix=new Object[1][rowCounter];
+      columnarData = new ArrayList<>(Arrays.asList(matrix));
     }
-    //Arrays.asList(matrix);
-    return columnarData;
 
-    //
-    //return listBasedResult;
+    return columnarData;
   }
 
   protected void fillDimensionData(AbstractScannedResult scannedResult, int[] surrogateResult,

@@ -28,6 +28,7 @@ import org.apache.carbondata.common.CarbonIterator;
 import org.apache.carbondata.core.scan.result.BatchResult;
 import org.apache.carbondata.presto.impl.*;
 
+import com.facebook.presto.hadoop.$internal.com.google.common.base.Throwables;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
@@ -112,7 +113,7 @@ public class CarbondataPageSource implements ConnectorPageSource {
         if (pageBuilder.isFull()) {
           break;
         }
-        if (!columnCursor.hasNext()) {
+        if (!columnCursor.hasNext() ) {
           closed = true;
           break;
         }
@@ -157,34 +158,12 @@ public class CarbondataPageSource implements ConnectorPageSource {
 
             }
           }
-          /*
-          if (cursor.isNull(column)) {
-            output.appendNull();
-          } else {
+        }
 
-
-            if (javaType == boolean.class) {
-              type.writeBoolean(output, cursor.getBoolean(column));
-            } else if (javaType == long.class) {
-              type.writeLong(output, cursor.getLong(column));
-            } else if (javaType == double.class) {
-              type.writeDouble(output, cursor.getDouble(column));
-            } else if (javaType == Slice.class) {
-              Slice slice = cursor.getSlice(column);
-              if(type instanceof  DecimalType)
-              {
-                if (isShortDecimal(type)) {
-                  type.writeLong(output, parseLong((DecimalType) type, slice, 0, slice.length()));
-                } else {
-                  type.writeSlice(output, parseSlice((DecimalType) type, slice, 0, slice.length()));
-                }
-              } else {
-                type.writeSlice(output, slice, 0, slice.length());
-              }
-            } else {
-              type.writeObject(output, cursor.getObject(column));
-            }
-          }*/
+        if(types.size() == 0) {
+          Object[] data = columnData.get(0);
+          pageBuilder.declarePositions(data.length);
+          System.out.println("Number of Rows in PageSource " + data.length);
         }
       }
     }
@@ -204,8 +183,21 @@ public class CarbondataPageSource implements ConnectorPageSource {
   }
 
   @Override public void close() throws IOException {
+    // some hive input formats are broken and bad things can happen if you close them multiple times
+    if (closed) {
+      return;
+    }
     closed = true;
-    cursor.close();
+
+    try {
+      columnCursor.close();
+      cursor.close();
+    }
+    catch (Exception e) {
+      throw Throwables.propagate(e);
+    }
+
+
 
   }
 

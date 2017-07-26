@@ -44,7 +44,7 @@ public class ColumnBasedResultIterator extends AbstractDetailQueryResultIterator
     synchronized (lock) {
       updateDataBlockIterator();
       if (dataBlockIterator != null) {
-        batchResult.setRows(dataBlockIterator.next());
+        batchResult.setRows(dataBlockIterator.processNextColumnBatch());
       }
     }
     return batchResult;

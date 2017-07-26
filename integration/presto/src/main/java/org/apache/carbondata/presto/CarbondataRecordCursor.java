@@ -204,7 +204,7 @@ public class CarbondataRecordCursor implements RecordCursor {
 
   @Override public void close() {
     nanoEnd = System.nanoTime();
-
+    readSupport.close();
     //todo  delete cache from readSupport
   }
 
