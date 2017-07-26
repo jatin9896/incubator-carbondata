@@ -35,7 +35,6 @@ import org.apache.carbondata.core.scan.result.AbstractScannedResult;
 import org.apache.carbondata.core.util.CarbonUtil;
 import org.apache.carbondata.core.util.DataTypeUtil;
 
-import com.twitter.chill.java.ArraysAsListSerializer;
 import org.apache.commons.lang3.ArrayUtils;
 
 import static org.apache.carbondata.core.constants.CarbonCommonConstants.COLUMNAR_DATA_READ_BATCH_SIZE;
@@ -93,13 +92,14 @@ public class ColumnBasedResultCollector extends AbstractScannedResultCollector {
 
     batchSize = Integer.parseInt(COLUMNAR_DATA_READ_BATCH_SIZE);
 
-    int noOfColumns=queryDimensions.length + queryMeasures.length;
+    int noOfColumns = queryDimensions.length + queryMeasures.length;
 
     int resultSize = scannedResult.numberOfOutputRows();
-    if(resultSize < batchSize) {
+    if (resultSize < batchSize) {
       batchSize = resultSize;
     }
 
+    Object[][] matrix = new Object[noOfColumns][batchSize];
     numberOfBatches++;
 
     Object[][] matrix=new Object[noOfColumns][batchSize];
@@ -110,7 +110,7 @@ public class ColumnBasedResultCollector extends AbstractScannedResultCollector {
     byte[][] noDictionaryKeys;
     byte[][] complexTypeKeyArray;
     while (scannedResult.hasNext() && rowCounter < batchSize) {
-      int[]rowData = new int[queryDimensions.length + queryMeasures.length];
+      int[] rowData = new int[queryDimensions.length + queryMeasures.length];
       Object[] row = new Object[queryDimensions.length + queryMeasures.length];
       if (isDimensionExists) {
         surrogateResult = scannedResult.getDictionaryKeyIntegerArray();
@@ -131,13 +131,27 @@ public class ColumnBasedResultCollector extends AbstractScannedResultCollector {
       }
       fillMeasureData(scannedResult, row);
 
-      for(int i=0; i<noOfColumns;i++) {
-        matrix[i][rowCounter]=row[i];
+      for (int i = 0; i < noOfColumns; i++) {
+        matrix[i][rowCounter] = row[i];
       }
 
       //  Object result = (Object)matrix;
       // listBasedResult.add(result);
       rowCounter++;
+    }
+    ArrayList<Object[]> columnarData = new ArrayList<>();
+
+    if (rowCounter < batchSize) {
+      Object[][] matrix_temp = new Object[noOfColumns][rowCounter];
+      for (int i = 0; i < noOfColumns; i++) {
+        for (int j = 0; j < rowCounter; j++) {
+          matrix_temp[i][j] = matrix[i][j];
+        }
+      }
+      columnarData = new ArrayList<>(Arrays.asList(matrix_temp));
+    } else {
+      // List<Object[]> columnarData = new ArrayList<>(matrix);
+      columnarData = new ArrayList<>(Arrays.asList(matrix));
     }
     System.out.println("############## rowCounter " + rowCounter);
     System.out.println("############## number of batches " + numberOfBatches + " " + batchSize);
@@ -149,10 +163,6 @@ public class ColumnBasedResultCollector extends AbstractScannedResultCollector {
       }
 
     }
-
-    // List<Object[]> columnarData = new ArrayList<>(matrix);
-    ArrayList<Object[]> columnarData = new ArrayList<>(Arrays.asList(matrix));
-
     //Arrays.asList(matrix);
     return columnarData;
 
