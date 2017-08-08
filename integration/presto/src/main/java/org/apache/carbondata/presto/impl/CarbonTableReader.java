@@ -246,7 +246,7 @@ public class CarbonTableReader {
    * @param schemaTableName name of the given table.
    * @return
    */
-  private CarbonTable loadTableMetadata(SchemaTableName schemaTableName) {
+  private synchronized CarbonTable loadTableMetadata(SchemaTableName schemaTableName) {
     for (SchemaTableName table : tableList) {
       if (!table.equals(schemaTableName)) continue;
 

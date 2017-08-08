@@ -167,7 +167,12 @@ public class CarbondataFilterUtil {
         } else if (coltype.equals(DataType.TIMESTAMP) || coltype.equals(DataType.DATE)) {
           Long value = (Long) singleValues.get(0) * 1000;
           ex = new EqualToExpression(colExpression, new LiteralExpression(value, coltype));
-        } else ex = new EqualToExpression(colExpression,
+        }
+        else if (coltype.equals(DataType.DATE)){
+          Long value = (Long) singleValues.get(0);
+          ex = new EqualToExpression(colExpression, new LiteralExpression(value, coltype));
+        }
+        else ex = new EqualToExpression(colExpression,
             new LiteralExpression(singleValues.get(0), coltype));
         filters.add(ex);
       } else if (singleValues.size() > 1) {
