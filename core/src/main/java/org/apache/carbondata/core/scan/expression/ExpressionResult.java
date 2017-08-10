@@ -183,7 +183,7 @@ public class ExpressionResult implements Comparable<ExpressionResult> {
             return parser.format((java.sql.Date) value);
           } else if (value instanceof Long) {
             if (isLiteral) {
-              return parser.format(new Timestamp((long) value / 1000));
+              return parser.format(new Timestamp((long) value));
             }
             return parser.format(new Timestamp((long) value));
           } else if (value instanceof Integer) {
