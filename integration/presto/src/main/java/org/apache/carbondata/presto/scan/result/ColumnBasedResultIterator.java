@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.carbondata.core.scan.result.iterator;
+package org.apache.carbondata.presto.scan.result;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -22,31 +22,32 @@ import java.util.concurrent.ExecutorService;
 import org.apache.carbondata.core.scan.executor.infos.BlockExecutionInfo;
 import org.apache.carbondata.core.scan.model.QueryModel;
 import org.apache.carbondata.core.scan.result.BatchResult;
+import org.apache.carbondata.presto.scan.result.iterator.AbstractDetailQueryResultIterator;
 
 /**
  * It reads the data in column batch format
  */
 public class ColumnBasedResultIterator extends AbstractDetailQueryResultIterator<Object> {
 
-  private final Object lock = new Object();
+    private final Object lock = new Object();
 
-  public ColumnBasedResultIterator(List<BlockExecutionInfo> infos, QueryModel queryModel,
-      ExecutorService execService) {
-    super(infos, queryModel, execService);
-  }
-
-  @Override public BatchResult next() {
-    return getBatchResult();
-  }
-
-  private BatchResult getBatchResult() {
-    BatchResult batchResult = new BatchResult();
-    synchronized (lock) {
-      updateDataBlockIterator();
-      if (dataBlockIterator != null) {
-        batchResult.setRows(dataBlockIterator.processNextColumnBatch());
-      }
+    public ColumnBasedResultIterator(List<BlockExecutionInfo> infos, QueryModel queryModel,
+                                     ExecutorService execService) {
+        super(infos, queryModel, execService);
     }
-    return batchResult;
-  }
+
+    @Override public BatchResult next() {
+        return getBatchResult();
+    }
+
+    private BatchResult getBatchResult() {
+        BatchResult batchResult = new BatchResult();
+        synchronized (lock) {
+            updateDataBlockIterator();
+            if (dataBlockIterator != null) {
+                batchResult.setRows(dataBlockIterator.processNextColumnBatch());
+            }
+        }
+        return batchResult;
+    }
 }

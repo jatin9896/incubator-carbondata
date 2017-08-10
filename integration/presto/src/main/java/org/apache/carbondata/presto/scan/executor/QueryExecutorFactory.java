@@ -14,15 +14,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.carbondata.presto.scan.executor;
 
-package org.apache.carbondata.core.scan.executor;
-
-import org.apache.carbondata.core.scan.executor.impl.ColumnDetailQueryExecutor;
+import org.apache.carbondata.core.scan.executor.QueryExecutor;
 import org.apache.carbondata.core.scan.model.QueryModel;
+import org.apache.carbondata.presto.scan.executor.impl.ColumnDetailQueryExecutor;
 
-public class PrestoQueryExecutorFactory {
+/**
+ * Factory class to get the query executor from RDD
+ * This will return the executor based on query type
+ */
+public class QueryExecutorFactory {
 
-  public static QueryExecutor getQueryExecutor() {
-    return new ColumnDetailQueryExecutor();
-  }
+    public static QueryExecutor getQueryExecutor(QueryModel queryModel) {
+
+        return new ColumnDetailQueryExecutor();
+
+    }
 }

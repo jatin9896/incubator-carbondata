@@ -26,7 +26,6 @@ import org.apache.carbondata.core.datastore.block.BlockletInfos;
 import org.apache.carbondata.core.datastore.block.TableBlockInfo;
 import org.apache.carbondata.core.metadata.ColumnarFormatVersion;
 import org.apache.carbondata.core.metadata.schema.table.CarbonTable;
-import org.apache.carbondata.core.scan.executor.PrestoQueryExecutorFactory;
 import org.apache.carbondata.core.scan.executor.QueryExecutor;
 import org.apache.carbondata.core.scan.expression.Expression;
 import org.apache.carbondata.core.scan.model.QueryModel;
@@ -39,6 +38,7 @@ import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.RecordSet;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.Type;
+import org.apache.carbondata.presto.scan.executor.QueryExecutorFactory;
 
 import static org.apache.carbondata.presto.Types.checkType;
 
@@ -88,10 +88,9 @@ class CarbondataRecordSet implements RecordSet {
         //blockletInfos,
         ColumnarFormatVersion.valueOf(split.getLocalInputSplit().getVersion()), null));
 
-    queryModel.setColumnCollector(true);
     queryModel.setTableBlockInfos(tableBlockInfoList);
 
-    queryExecutor = PrestoQueryExecutorFactory.getQueryExecutor();
+    queryExecutor = QueryExecutorFactory.getQueryExecutor(queryModel);
 
     CarbonProperties.getInstance().addProperty("carbon.detail.batch.size", "4096");
 

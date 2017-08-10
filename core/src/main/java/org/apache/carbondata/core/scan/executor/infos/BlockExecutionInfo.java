@@ -224,10 +224,6 @@ public class BlockExecutionInfo {
   private String[] deleteDeltaFilePath;
 
   private Map<String, DeleteDeltaVo> deletedRecordsMap;
-
-
-  private boolean columnCollector;
-
   public AbsoluteTableIdentifier getAbsoluteTableIdentifier() {
     return absoluteTableIdentifier;
   }
@@ -661,13 +657,5 @@ public class BlockExecutionInfo {
    */
   public void setDeletedRecordsMap(Map<String, DeleteDeltaVo> deletedRecordsMap) {
     this.deletedRecordsMap = deletedRecordsMap;
-  }
-
-  public boolean isColumnCollector() {
-    return columnCollector;
-  }
-
-  public void setColumnCollector(boolean columnCollector) {
-    this.columnCollector = columnCollector;
   }
 }

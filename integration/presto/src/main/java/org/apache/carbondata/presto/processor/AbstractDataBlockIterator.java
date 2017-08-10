@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.carbondata.core.scan.processor;
+package org.apache.carbondata.presto.processor;
 
 import java.io.IOException;
 import java.util.List;
@@ -29,15 +29,17 @@ import org.apache.carbondata.common.logging.LogService;
 import org.apache.carbondata.common.logging.LogServiceFactory;
 import org.apache.carbondata.core.datastore.DataRefNode;
 import org.apache.carbondata.core.datastore.FileHolder;
-import org.apache.carbondata.core.scan.collector.ResultCollectorFactory;
 import org.apache.carbondata.core.scan.collector.ScannedResultCollector;
 import org.apache.carbondata.core.scan.executor.infos.BlockExecutionInfo;
+import org.apache.carbondata.core.scan.processor.BlockletIterator;
+import org.apache.carbondata.core.scan.processor.BlocksChunkHolder;
 import org.apache.carbondata.core.scan.result.AbstractScannedResult;
 import org.apache.carbondata.core.scan.result.vector.CarbonColumnarBatch;
 import org.apache.carbondata.core.scan.scanner.BlockletScanner;
 import org.apache.carbondata.core.scan.scanner.impl.FilterScanner;
 import org.apache.carbondata.core.scan.scanner.impl.NonFilterScanner;
 import org.apache.carbondata.core.stats.QueryStatisticsModel;
+import org.apache.carbondata.presto.scan.collector.ResultCollectorFactory;
 
 /**
  * This abstract class provides a skeletal implementation of the
@@ -46,12 +48,12 @@ import org.apache.carbondata.core.stats.QueryStatisticsModel;
 public abstract class AbstractDataBlockIterator extends CarbonIterator<List<Object[]>> {
 
   private static final LogService LOGGER =
-      LogServiceFactory.getLogService(AbstractDataBlockIterator.class.getName());
+          LogServiceFactory.getLogService(AbstractDataBlockIterator.class.getName());
 
   /**
    * iterator which will be used to iterate over data blocks
    */
-  protected CarbonIterator<DataRefNode> dataBlockIterator;
+  private CarbonIterator<DataRefNode> dataBlockIterator;
 
   /**
    * result collector which will be used to aggregate the scanned result
@@ -62,7 +64,7 @@ public abstract class AbstractDataBlockIterator extends CarbonIterator<List<Obje
    * processor which will be used to process the block processing can be
    * filter processing or non filter processing
    */
-  protected BlockletScanner blockletScanner;
+  private BlockletScanner blockletScanner;
 
   /**
    * batch size of result
@@ -86,18 +88,18 @@ public abstract class AbstractDataBlockIterator extends CarbonIterator<List<Obje
   private AtomicBoolean nextRead;
 
   public AbstractDataBlockIterator(BlockExecutionInfo blockExecutionInfo, FileHolder fileReader,
-      int batchSize, QueryStatisticsModel queryStatisticsModel, ExecutorService executorService) {
+                                   int batchSize, QueryStatisticsModel queryStatisticsModel, ExecutorService executorService) {
     this.blockExecutionInfo = blockExecutionInfo;
     this.fileReader = fileReader;
     dataBlockIterator = new BlockletIterator(blockExecutionInfo.getFirstDataBlock(),
-        blockExecutionInfo.getNumberOfBlockToScan());
+            blockExecutionInfo.getNumberOfBlockToScan());
     if (blockExecutionInfo.getFilterExecuterTree() != null) {
       blockletScanner = new FilterScanner(blockExecutionInfo, queryStatisticsModel);
     } else {
       blockletScanner = new NonFilterScanner(blockExecutionInfo, queryStatisticsModel);
     }
     this.scannerResultAggregator =
-        ResultCollectorFactory.getScannedResultCollector(blockExecutionInfo);
+            ResultCollectorFactory.getScannedResultCollector(blockExecutionInfo);
     this.batchSize = batchSize;
     this.executorService = executorService;
     this.nextBlock = new AtomicBoolean(false);
@@ -162,8 +164,8 @@ public abstract class AbstractDataBlockIterator extends CarbonIterator<List<Obje
 
   private BlocksChunkHolder getBlocksChunkHolderInternal() throws IOException {
     BlocksChunkHolder blocksChunkHolder =
-        new BlocksChunkHolder(blockExecutionInfo.getTotalNumberDimensionBlock(),
-            blockExecutionInfo.getTotalNumberOfMeasureBlock(), fileReader);
+            new BlocksChunkHolder(blockExecutionInfo.getTotalNumberDimensionBlock(),
+                    blockExecutionInfo.getTotalNumberOfMeasureBlock(), fileReader);
     blocksChunkHolder.setDataBlock(dataBlockIterator.next());
     if (blocksChunkHolder.getDataBlock().getColumnsMaxValue() == null) {
       return blocksChunkHolder;
@@ -212,24 +214,7 @@ public abstract class AbstractDataBlockIterator extends CarbonIterator<List<Obje
 
   public abstract void processNextBatch(CarbonColumnarBatch columnarBatch);
 
-  /**
-   * Close the resources
-   */
-  public void close() {
-    // free the current scanned result
-    if (null != scannedResult && !scannedResult.hasNext()) {
-      scannedResult.freeMemory();
-    }
-    // free any pre-fetched memory if present
-    if (null != future) {
-      try {
-        AbstractScannedResult abstractScannedResult = future.get();
-        if (abstractScannedResult != null) {
-          abstractScannedResult.freeMemory();
-        }
-      } catch (InterruptedException | ExecutionException e) {
-        throw new RuntimeException(e);
-      }
-    }
-  }
+  public abstract List<Object[]>  processNextColumnBatch();
+
+
 }
