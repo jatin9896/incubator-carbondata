@@ -19,6 +19,8 @@ package org.apache.carbondata.presto;
 
 import java.util.List;
 
+import org.apache.carbondata.presto.memory.AggregatedMemoryContext;
+
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.ConnectorSession;
@@ -32,7 +34,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * Provider Class for Carbondata Page Source class.
  */
-public class CarbondataPageSourceProvider implements ConnectorPageSourceProvider {
+class CarbondataPageSourceProvider implements ConnectorPageSourceProvider {
 
   private CarbondataRecordSetProvider carbondataRecordSetProvider;
 
@@ -45,6 +47,7 @@ public class CarbondataPageSourceProvider implements ConnectorPageSourceProvider
   @Override
   public ConnectorPageSource createPageSource(ConnectorTransactionHandle transactionHandle,
       ConnectorSession session, ConnectorSplit split, List<ColumnHandle> columns) {
-    return new CarbondataPageSource(carbondataRecordSetProvider.getRecordSet(transactionHandle, session, split, columns));
+    AggregatedMemoryContext systemMemoryUsage = new AggregatedMemoryContext();
+    return new CarbondataPageSource(carbondataRecordSetProvider.getRecordSet(transactionHandle, session, split, columns), systemMemoryUsage);
   }
 }

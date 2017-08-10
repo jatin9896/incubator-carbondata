@@ -19,12 +19,25 @@ package org.apache.carbondata.presto;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.carbondata.common.CarbonIterator;
+import org.apache.carbondata.common.logging.LogService;
+import org.apache.carbondata.common.logging.LogServiceFactory;
+import org.apache.carbondata.core.scan.result.BatchResult;
+import org.apache.carbondata.presto.memory.AggregatedMemoryContext;
+import org.apache.carbondata.presto.readers.StreamReader;
+import org.apache.carbondata.presto.readers.StreamReaders;
+import org.apache.carbondata.processing.newflow.exception.CarbonDataLoadingException;
+
+import com.facebook.presto.hadoop.$internal.com.google.common.base.Throwables;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.RecordSet;
 import com.facebook.presto.spi.block.Block;
@@ -32,13 +45,17 @@ import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.LazyBlock;
 import com.facebook.presto.spi.block.LazyBlockLoader;
 import com.facebook.presto.spi.type.DecimalType;
+import com.facebook.presto.spi.type.Decimals;
+import com.facebook.presto.spi.type.TimestampType;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.slice.Slice;
 
 import static com.facebook.presto.spi.type.Decimals.encodeUnscaledValue;
 import static com.facebook.presto.spi.type.Decimals.isShortDecimal;
+import static com.facebook.presto.spi.type.Decimals.rescale;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static io.airlift.slice.Slices.utf8Slice;
 import static java.math.RoundingMode.HALF_UP;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
@@ -46,25 +63,36 @@ import static java.util.Objects.requireNonNull;
 /**
  * Carbondata Page Source class for custom Carbondata RecordSet Iteration.
  */
-public class CarbondataPageSource implements ConnectorPageSource {
+class CarbondataPageSource implements ConnectorPageSource {
 
   private static final int ROWS_PER_REQUEST = 4096;
+  private static final LogService logger =
+      LogServiceFactory.getLogService(CarbondataPageSource.class.getName());
   private final RecordCursor cursor;
   private final List<Type> types;
   private final PageBuilder pageBuilder;
-  private boolean closed;
   private final char[] buffer = new char[100];
-  private Block[] blocks;
+  private boolean closed;
+  private CarbonIterator<BatchResult> columnCursor;
+  private CarbonDictionaryDecodeReadSupport<Object[]> readSupport;
+  private long sizeOfData = 0;
+  private final AggregatedMemoryContext systemMemoryContext;
+  private final StreamReader[] readers ;
+  private int batchId;
+  private int noOfPages;
 
-  public CarbondataPageSource(RecordSet recordSet) {
-    this(requireNonNull(recordSet, "recordSet is null").getColumnTypes(), recordSet.cursor());
+  CarbondataPageSource(RecordSet recordSet, AggregatedMemoryContext systemMemoryContext) {
+    this(requireNonNull(recordSet, "recordSet is null").getColumnTypes(), recordSet.cursor(), systemMemoryContext);
   }
 
-  public CarbondataPageSource(List<Type> types, RecordCursor cursor) {
+  private CarbondataPageSource(List<Type> types, RecordCursor cursor,AggregatedMemoryContext systemMemoryContext) {
     this.cursor = requireNonNull(cursor, "cursor is null");
     this.types = unmodifiableList(new ArrayList<>(requireNonNull(types, "types is null")));
     this.pageBuilder = new PageBuilder(this.types);
-    this.blocks = new Block[types.size()];
+    this.columnCursor = ((CarbondataRecordCursor) cursor).getColumnCursor();
+    this.readSupport = ((CarbondataRecordCursor) cursor).getReadSupport();
+    this.systemMemoryContext = systemMemoryContext;
+    this.readers = createStreamReaders();
   }
 
   public RecordCursor getCursor() {
@@ -88,122 +116,131 @@ public class CarbondataPageSource implements ConnectorPageSource {
   }
 
   @Override public Page getNextPage() {
-    BlockBuilder output;
-    Page page;
-    int size = types.size();
-    if (!closed) {
-      int i;
-      for (i = 0; i < ROWS_PER_REQUEST; i++) {
-        if (pageBuilder.isFull()) {
-          break;
-        }
-        if (!cursor.advanceNextPosition()) {
-          closed = true;
-          break;
-        }
 
-        pageBuilder.declarePosition();
-
-        for (int column = 0; column < size; column++) {
-          output = pageBuilder.getBlockBuilder(column);
-          if (cursor.isNull(column)) {
-            output.appendNull();
-          } else {
-            Type type = types.get(column);
-            Class<?> javaType = type.getJavaType();
-            if (javaType == boolean.class) {
-              type.writeBoolean(output, cursor.getBoolean(column));
-            } else if (javaType == long.class) {
-              type.writeLong(output, cursor.getLong(column));
-            } else if (javaType == double.class) {
-              type.writeDouble(output, cursor.getDouble(column));
-            } else if (javaType == Slice.class) {
-              Slice slice = cursor.getSlice(column);
-              if (type instanceof DecimalType) {
-                if (isShortDecimal(type)) {
-                  type.writeLong(output, parseLong((DecimalType) type, slice, 0, slice.length()));
-                } else {
-                  type.writeSlice(output, parseSlice((DecimalType) type, slice, 0, slice.length()));
-                }
-              } else {
-                type.writeSlice(output, slice, 0, slice.length());
-              }
-            } else {
-              type.writeObject(output, cursor.getObject(column));
-            }
+    BatchResult columnBatch;
+    List<Object[]> columnData;
+    noOfPages++;
+    int batchSize = 0;
+    try {
+      batchId++;
+      if(columnCursor.hasNext()) {
+        columnBatch = columnCursor.next();
+        columnData = columnBatch.getRows();
+        if(columnBatch.getSize() > 0) {
+          batchSize = columnBatch.getRows().get(0).length;
+          if (batchSize <= 0) {
+            close();
+            return null;
           }
-          blocks[column] = new LazyBlock(output.getPositionCount(),
-              new CarbonBlockLoader(output.build(), types.get(column)));
         }
+        if(columnData.size() != types.size()){
+          close();
+          return null;
+        }
+      } else {
+        close();
+        return null;
       }
+
+      Block[] blocks = new Block[columnData.size()];
+      for (int column = 0; column < blocks.length; column++) {
+        Type type = types.get(column);
+        readers[column].setStreamData(columnData.get(column));
+        blocks[column] = new LazyBlock(batchSize, new CarbondataBlockLoader(column, type));
+      }
+      Page page = new Page(batchSize, blocks);
+      sizeOfData += page.getSizeInBytes();
+      return page;
+    }
+    catch (PrestoException e) {
+      closeWithSuppression(e);
+      throw e;
+    }
+    catch ( RuntimeException e) {
+      closeWithSuppression(e);
+      throw new RuntimeException("Exception when creating the Carbon data Block", e);
     }
 
-    // only return a page if the buffer is full or we are finishing
-    if (pageBuilder.isEmpty() || (!closed && !pageBuilder.isFull())) {
-      return null;
-    }
-
-    if (blocks != null && blocks.length > 0) {
-      page = new Page(blocks[0].getPositionCount(), blocks);
-    } else {
-      page = pageBuilder.build();
-    }
-
-    pageBuilder.reset();
-    return page;
   }
 
   @Override public long getSystemMemoryUsage() {
-    return cursor.getSystemMemoryUsage() + pageBuilder.getSizeInBytes();
+    ((CarbondataRecordCursor)cursor).addTotalBytes(sizeOfData);
+    return cursor.getSystemMemoryUsage();
   }
 
-  @Override public void close() throws IOException {
+  @Override public void close()  {
+    // some hive input formats are broken and bad things can happen if you close them multiple times
+    if (closed) {
+      return;
+    }
     closed = true;
-    cursor.close();
 
-  }
-
-  private long parseLong(DecimalType type, Slice slice, int offset, int length) {
-    BigDecimal decimal = parseBigDecimal(type, slice, offset, length);
-    return decimal.unscaledValue().longValue();
-  }
-
-  private Slice parseSlice(DecimalType type, Slice slice, int offset, int length) {
-    BigDecimal decimal = parseBigDecimal(type, slice, offset, length);
-    return encodeUnscaledValue(decimal.unscaledValue());
-  }
-
-  private BigDecimal parseBigDecimal(DecimalType type, Slice slice, int offset, int length) {
-    checkArgument(length < buffer.length);
-    for (int i = 0; i < length; i++) {
-      buffer[i] = (char) slice.getByte(offset + i);
+    try {
+      columnCursor.close();
+      cursor.close();
+    } catch (Exception e) {
+      throw Throwables.propagate(e);
     }
-    BigDecimal decimal = new BigDecimal(buffer, 0, length);
-    checkState(decimal.scale() <= type.getScale(),
-        "Read decimal value scale larger than column scale");
-    decimal = decimal.setScale(type.getScale(), HALF_UP);
-    checkState(decimal.precision() <= type.getPrecision(),
-        "Read decimal precision larger than column precision");
-    return decimal;
+
   }
 
-  /**
-   * Using the LazyBlockLoader
-   */
-  private static final class CarbonBlockLoader implements LazyBlockLoader<LazyBlock> {
+  private void closeWithSuppression(Throwable throwable)
+  {
+    requireNonNull(throwable, "throwable is null");
+    try {
+      close();
+    }
+    catch (RuntimeException e) {
+      // Self-suppression not permitted
+      if (throwable != e) {
+        throwable.addSuppressed(e);
+      }
+    }
+  }
+
+  private final class CarbondataBlockLoader
+      implements LazyBlockLoader<LazyBlock>
+  {
+    private final int expectedBatchId = batchId;
+    private final int columnIndex;
+    private final Type type;
     private boolean loaded;
-    private Block dataBlock;
 
-    public CarbonBlockLoader(Block dataBlock, Type type) {
-      this.dataBlock = dataBlock;
+    CarbondataBlockLoader(int columnIndex, Type type)
+    {
+      this.columnIndex = columnIndex;
+      this.type = requireNonNull(type, "type is null");
     }
 
-    @Override public void load(LazyBlock block) {
+    @Override
+    public final void load(LazyBlock lazyBlock)
+    {
       if (loaded) {
         return;
       }
-      block.setBlock(dataBlock);
+
+      checkState(batchId == expectedBatchId);
+
+      try {
+        Block block = readers[columnIndex].readBlock(type);
+        lazyBlock.setBlock(block);
+      }
+      catch (IOException e) {
+        throw new CarbonDataLoadingException("Error in Reading Data from Carbondata ", e);
+      }
+
       loaded = true;
     }
   }
+
+
+  private StreamReader[] createStreamReaders(){
+    requireNonNull(types);
+    StreamReader[] readers = new StreamReader[types.size()];
+    for(int i=0; i < types.size(); i++) {
+      readers[i] = StreamReaders.createStreamReader(types.get(i), null);
+    }
+    return readers;
+  }
+
 }
