@@ -718,11 +718,11 @@ public class CarbonTableReader {
                     blkLocations[blkIndex].getHosts()));
               }
             } else {
-              splits.add(new FileSplit(path, 0L, length,
+              splits.add(new org.apache.hadoop.mapreduce.lib.input.FileSplit(path, 0L, length,
                   blkLocations[0].getHosts()));
             }
           } else {
-            splits.add(new FileSplit(path, 0L, length,
+            splits.add(new org.apache.hadoop.mapreduce.lib.input.FileSplit(path, 0L, length,
                 new String[0]));
           }
         }
