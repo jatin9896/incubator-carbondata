@@ -429,7 +429,7 @@ public class CarbonTableReader {
               tableBlockInfo.getVersion().number()));
         }
       } catch (Exception ex) {
-        throw new RuntimeException(ex);
+        ex.printStackTrace();
       }
     }
     cacheClient.close();

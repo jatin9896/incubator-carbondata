@@ -54,7 +54,7 @@ public class DecimalSliceStreamReader implements StreamReader {
       DecimalType actual = (DecimalType) type;
       BigDecimal bigDecimalValue = new BigDecimal(value.toString());
       if (isShortDecimal(type)) {
-        return utf8Slice(Decimals.toString(bigDecimalValue.longValue(), actual.getScale()));
+        return utf8Slice(Decimals.toString(bigDecimalValue.unscaledValue(), actual.getScale()));
       } else {
         if (bigDecimalValue.scale() > actual.getScale()) {
           BigInteger unscaledDecimal =

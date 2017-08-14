@@ -131,7 +131,7 @@ class CarbondataRecordCursor implements RecordCursor {
       String fieldValue = getFieldValue(field);
       BigDecimal bigDecimalValue = new BigDecimal(fieldValue);
       if (isShortDecimal(decimalType)) {
-        return utf8Slice(Decimals.toString(bigDecimalValue.longValue(), actual.getScale()));
+        return utf8Slice(Decimals.toString(bigDecimalValue.unscaledValue(), actual.getScale()));
       } else {
         if (bigDecimalValue.scale() > actual.getScale()) {
           BigInteger unscaledDecimal =
@@ -192,7 +192,7 @@ class CarbondataRecordCursor implements RecordCursor {
     return totalBytes;
   }
 
-  public void addTotalBytes(long totalBytes) {
+  void addTotalBytes(long totalBytes) {
     this.totalBytes = totalBytes;
   }
 }
