@@ -20,7 +20,7 @@ public class LongStreamReader implements StreamReader {
     BlockBuilder builder = type.createBlockBuilder(new BlockBuilderStatus(), batchSize);
     if (streamData != null) {
       for (int i = 0; i < batchSize; i++) {
-        type.writeLong(builder, (Long) streamData[i]);
+        type.writeLong(builder, Long.parseLong(streamData[i].toString()));
       }
     }
     return builder.build();
