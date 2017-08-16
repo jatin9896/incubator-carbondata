@@ -1,6 +1,3 @@
-package org.apache.carbondata.presto.readers;
-
-
 /*
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +11,7 @@ package org.apache.carbondata.presto.readers;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.carbondata.presto.readers;
 
 import com.facebook.presto.spi.type.DateType;
 import com.facebook.presto.spi.type.DecimalType;
