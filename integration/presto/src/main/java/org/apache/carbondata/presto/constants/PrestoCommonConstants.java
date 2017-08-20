@@ -17,12 +17,13 @@
 
 package org.apache.carbondata.presto.constants;
 
-public final class CarbonCommonConstants {
+/**
+ * Constants for presto functionality
+ */
+public final class PrestoCommonConstants {
 
   public static final String COLUMNAR_DATA_READ_BATCH_SIZE = "4096";
 
-  private CarbonCommonConstants() {
-  }
 }
 
 

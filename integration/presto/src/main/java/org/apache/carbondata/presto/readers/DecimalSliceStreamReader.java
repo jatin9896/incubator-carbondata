@@ -36,6 +36,10 @@ import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.slice.Slices.utf8Slice;
 import static java.math.RoundingMode.HALF_UP;
 
+/**
+ * This class creates streamReader
+ * for decimal data type
+ */
 public class DecimalSliceStreamReader implements StreamReader {
 
   private final char[] buffer = new char[100];
@@ -49,8 +53,8 @@ public class DecimalSliceStreamReader implements StreamReader {
     int batchSize = streamData.length;
     BlockBuilder builder = type.createBlockBuilder(new BlockBuilderStatus(), batchSize);
     if (streamData != null) {
-      for (int i = 0; i < batchSize; i++) {
-        Slice slice = getSlice(streamData[i], type);
+      for (Object aStreamData : streamData) {
+        Slice slice = getSlice(aStreamData, type);
         if (isShortDecimal(type)) {
           type.writeLong(builder, parseLong((DecimalType) type, slice, 0, slice.length()));
         } else {

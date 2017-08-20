@@ -25,20 +25,20 @@ import com.facebook.presto.spi.type.Type;
 
 import static io.airlift.slice.Slices.utf8Slice;
 
+/**
+ * This class creates streamReader
+ * for slice data type
+ */
 public class SliceStreamReader implements StreamReader {
 
   private Object[] streamData;
-
-  public SliceStreamReader() {
-
-  }
 
   public Block readBlock(Type type) throws IOException {
     int batchSize = streamData.length;
     BlockBuilder builder = type.createBlockBuilder(new BlockBuilderStatus(), batchSize);
     if (streamData != null) {
-      for (int i = 0; i < batchSize; i++) {
-        type.writeSlice(builder, utf8Slice(streamData[i].toString()));
+      for (Object aStreamData : streamData) {
+        type.writeSlice(builder, utf8Slice(aStreamData.toString()));
       }
     }
     return builder.build();

@@ -37,7 +37,7 @@ import org.apache.carbondata.core.util.DataTypeUtil;
 
 import static org.apache.carbondata.core.constants.CarbonCommonConstants.CARBON_IMPLICIT_COLUMN_TUPLEID;
 import static org.apache.carbondata.core.constants.CarbonCommonConstants.FILE_SEPARATOR;
-import static org.apache.carbondata.presto.constants.CarbonCommonConstants.COLUMNAR_DATA_READ_BATCH_SIZE;
+import static org.apache.carbondata.presto.constants.PrestoCommonConstants.COLUMNAR_DATA_READ_BATCH_SIZE;
 
 import org.apache.commons.lang3.ArrayUtils;
 

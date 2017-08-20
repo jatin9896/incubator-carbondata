@@ -45,10 +45,10 @@ import org.apache.carbondata.core.stats.QueryStatisticsModel;
  * This abstract class provides a skeletal implementation of the
  * Block iterator.
  */
-public abstract class AbstractDataBlockIterator extends CarbonIterator<List<Object[]>> {
+public abstract class CarbonDataBlockIterator extends CarbonIterator<List<Object[]>> {
 
   private static final LogService LOGGER =
-      LogServiceFactory.getLogService(AbstractDataBlockIterator.class.getName());
+      LogServiceFactory.getLogService(CarbonDataBlockIterator.class.getName());
 
   /**
    * iterator which will be used to iterate over data blocks
@@ -87,7 +87,7 @@ public abstract class AbstractDataBlockIterator extends CarbonIterator<List<Obje
 
   private AtomicBoolean nextRead;
 
-  public AbstractDataBlockIterator(BlockExecutionInfo blockExecutionInfo, FileHolder fileReader,
+  public CarbonDataBlockIterator(BlockExecutionInfo blockExecutionInfo, FileHolder fileReader,
       int batchSize, QueryStatisticsModel queryStatisticsModel, ExecutorService executorService) {
     this.blockExecutionInfo = blockExecutionInfo;
     this.fileReader = fileReader;

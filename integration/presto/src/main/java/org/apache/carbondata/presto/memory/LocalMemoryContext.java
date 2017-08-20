@@ -19,6 +19,9 @@ package org.apache.carbondata.presto.memory;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
+/**
+ * This class will initialized the parentMemoryContext
+ */
 public class LocalMemoryContext {
   private final AbstractAggregatedMemoryContext parentMemoryContext;
   private long usedBytes;

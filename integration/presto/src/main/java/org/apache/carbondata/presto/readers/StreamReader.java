@@ -1,4 +1,3 @@
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -22,7 +21,10 @@ import java.io.IOException;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.type.Type;
 
-
+/**
+ * This interface provides a skeletal implementation of the
+ * StreamReader.
+ */
 public interface StreamReader {
 
   Block readBlock(Type type) throws IOException;

@@ -646,7 +646,7 @@ public class CarbonTableReader {
               new TableBlockInfo(inputSplit.getPath().toString(), inputSplit.getStart(), segmentId,
                   inputSplit.getLocations(), inputSplit.getLength(), blockletInfos,
                   ColumnarFormatVersion
-                      .valueOf(CarbonCommonConstants.CARBON_DATA_FILE_DEFAULT_VERSION), null/*new HashMap<>(CarbonCommonConstants.DEFAULT_COLLECTION_SIZE)*/));//这里的null是否会异常？
+                      .valueOf(CarbonCommonConstants.CARBON_DATA_FILE_DEFAULT_VERSION), null/*new HashMap<>(PrestoCommonConstants.DEFAULT_COLLECTION_SIZE)*/));//这里的null是否会异常？
         }
       }
 

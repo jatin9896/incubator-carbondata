@@ -16,25 +16,22 @@
  */
 package org.apache.carbondata.presto.memory;
 
-
-abstract class AbstractAggregatedMemoryContext
-{
-  // This class should remain exactly the same as AbstractAggregatedMemoryContext in com.facebook.presto.memory
-
-  // AbstractMemoryContext class is only necessary because we need implementations that bridge
-  // AggregatedMemoryContext with the existing memory tracking APIs in XxxxContext. Once they
-  // are refactored, there will be only one implementation of this abstract class, and this class
-  // can be removed.
+/**
+ * This class should remain exactly the same as AbstractAggregatedMemoryContext in com.facebook.presto.memory
+ * AbstractMemoryContext class is only necessary because we need implementations that bridge
+ * AggregatedMemoryContext with the existing memory tracking APIs in XxxxContext. Once they
+ * are refactored, there will be only one implementation of this abstract class, and this class
+ * can be removed.
+ */
+abstract class AbstractAggregatedMemoryContext {
 
   protected abstract void updateBytes(long bytes);
 
-  public AggregatedMemoryContext newAggregatedMemoryContext()
-  {
+  public AggregatedMemoryContext newAggregatedMemoryContext() {
     return new AggregatedMemoryContext(this);
   }
 
-  public LocalMemoryContext newLocalMemoryContext()
-  {
+  public LocalMemoryContext newLocalMemoryContext() {
     return new LocalMemoryContext(this);
   }
 }

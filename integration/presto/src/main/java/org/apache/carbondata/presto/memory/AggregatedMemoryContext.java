@@ -20,8 +20,10 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
+/**
+ * This class should remain exactly the same as AggregatedMemoryContext in com.facebook.presto.memory
+ **/
 public class AggregatedMemoryContext extends AbstractAggregatedMemoryContext {
-  // This class should remain exactly the same as AggregatedMemoryContext in com.facebook.presto.memory
 
   private final AbstractAggregatedMemoryContext parentMemoryContext;
   private long usedBytes;
@@ -35,11 +37,6 @@ public class AggregatedMemoryContext extends AbstractAggregatedMemoryContext {
     this.parentMemoryContext = requireNonNull(parentMemoryContext, "parentMemoryContext is null");
   }
 
-  public long getBytes() {
-    checkState(!closed);
-    return usedBytes;
-  }
-
   @Override protected void updateBytes(long bytes) {
     checkState(!closed);
     if (parentMemoryContext != null) {
@@ -48,16 +45,6 @@ public class AggregatedMemoryContext extends AbstractAggregatedMemoryContext {
     usedBytes += bytes;
   }
 
-  public void close() {
-    if (closed) {
-      return;
-    }
-    closed = true;
-    if (parentMemoryContext != null) {
-      parentMemoryContext.updateBytes(-usedBytes);
-    }
-    usedBytes = 0;
-  }
 
   @Override public String toString() {
     return toStringHelper(this).add("usedBytes", usedBytes).add("closed", closed).toString();

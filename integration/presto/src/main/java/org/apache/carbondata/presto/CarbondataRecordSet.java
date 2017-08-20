@@ -97,7 +97,7 @@ class CarbondataRecordSet implements RecordSet {
       readSupport
           .initialize(queryModel.getProjectionColumns(), queryModel.getAbsoluteTableIdentifier());
       CarbonIterator carbonIterator = queryExecutor.execute(queryModel);
-      return new CarbondataRecordCursor(readSupport, carbonIterator, columns, split);
+      return new CarbondataRecordCursor(readSupport, carbonIterator, columns);
     } catch (Exception ex) {
       throw new RuntimeException(ex.getMessage(), ex);
     }

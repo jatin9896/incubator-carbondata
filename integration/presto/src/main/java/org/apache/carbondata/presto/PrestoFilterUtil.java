@@ -12,6 +12,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.carbondata.presto;
@@ -57,7 +58,10 @@ import io.airlift.slice.Slice;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-public class CarbondataFilterUtil {
+/**
+ * PrestoFilterUtil create the carbonData Expression from the presto-domain
+ */
+public class PrestoFilterUtil {
 
   private static Map<Integer, Expression> filterMap = new HashMap<>();
 
@@ -159,16 +163,16 @@ public class CarbondataFilterUtil {
           ex = new EqualToExpression(colExpression,
               new LiteralExpression(singleValues.get(0), coltype));
         } else if (coltype.equals(DataType.TIMESTAMP) || coltype.equals(DataType.DATE)) {
-          Long value = (Long) singleValues.get(0) ;
+          Long value = (Long) singleValues.get(0);
           ex = new EqualToExpression(colExpression, new LiteralExpression(value, coltype));
         } else ex = new EqualToExpression(colExpression,
             new LiteralExpression(singleValues.get(0), coltype));
         filters.add(ex);
       } else if (singleValues.size() > 1) {
         ListExpression candidates = null;
-        List<Expression> exs = singleValues.stream().map((a) -> {
-          return new LiteralExpression(ConvertDataByType(a, type), coltype);
-        }).collect(Collectors.toList());
+        List<Expression> exs = singleValues.stream()
+            .map((a) -> new LiteralExpression(ConvertDataByType(a, type), coltype))
+            .collect(Collectors.toList());
         candidates = new ListExpression(exs);
 
         filters.add(new InExpression(colExpression, candidates));
@@ -204,20 +208,19 @@ public class CarbondataFilterUtil {
     if (type.equals(IntegerType.INTEGER)) return new Integer((rawdata.toString()));
     else if (type.equals(BigintType.BIGINT)) return rawdata;
     else if (type.equals(VarcharType.VARCHAR)) {
-      if(rawdata instanceof Slice) {
+      if (rawdata instanceof Slice) {
         return ((Slice) rawdata).toStringUtf8();
       } else {
         return rawdata;
       }
 
-    }
-    else if (type.equals(BooleanType.BOOLEAN)) return rawdata;
+    } else if (type.equals(BooleanType.BOOLEAN)) return rawdata;
     else if (type.equals(DateType.DATE)) {
       Calendar c = Calendar.getInstance();
       c.setTime(new Date(0));
-      c.add(Calendar.DAY_OF_YEAR, ((Long)rawdata).intValue());
+      c.add(Calendar.DAY_OF_YEAR, ((Long) rawdata).intValue());
       Date date = c.getTime();
-      return date.getTime();
+      return date.getTime() * 1000;
     }
 
     return rawdata;

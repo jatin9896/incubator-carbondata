@@ -23,20 +23,20 @@ import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.Type;
 
+/**
+ * This class creates streamReader
+ * for object data type
+ */
 public class ObjectStreamReader implements StreamReader {
 
   private Object[] streamData;
-
-  public ObjectStreamReader() {
-
-  }
 
   public Block readBlock(Type type) throws IOException {
     int batchSize = streamData.length;
     BlockBuilder builder = type.createBlockBuilder(new BlockBuilderStatus(), batchSize);
     if (streamData != null) {
-      for (int i = 0; i < batchSize; i++) {
-        type.writeObject(builder, streamData[i]);
+      for (Object aStreamData : streamData) {
+        type.writeObject(builder, aStreamData);
       }
     }
     return builder.build();

@@ -29,25 +29,25 @@ import org.apache.carbondata.presto.scan.result.iterator.AbstractDetailQueryResu
  */
 public class ColumnBasedResultIterator extends AbstractDetailQueryResultIterator<Object> {
 
-    private final Object lock = new Object();
+  private final Object lock = new Object();
 
-    public ColumnBasedResultIterator(List<BlockExecutionInfo> infos, QueryModel queryModel,
-                                     ExecutorService execService) {
-        super(infos, queryModel, execService);
-    }
+  public ColumnBasedResultIterator(List<BlockExecutionInfo> infos, QueryModel queryModel,
+      ExecutorService execService) {
+    super(infos, queryModel, execService);
+  }
 
-    @Override public BatchResult next() {
-        return getBatchResult();
-    }
+  @Override public BatchResult next() {
+    return getBatchResult();
+  }
 
-    private BatchResult getBatchResult() {
-        BatchResult batchResult = new BatchResult();
-        synchronized (lock) {
-            updateDataBlockIterator();
-            if (dataBlockIterator != null) {
-                batchResult.setRows(dataBlockIterator.processNextColumnBatch());
-            }
-        }
-        return batchResult;
+  private BatchResult getBatchResult() {
+    BatchResult batchResult = new BatchResult();
+    synchronized (lock) {
+      updateDataBlockIterator();
+      if (dataBlockIterator != null) {
+        batchResult.setRows(dataBlockIterator.processNextColumnBatch());
+      }
     }
+    return batchResult;
+  }
 }

@@ -24,6 +24,7 @@ import org.apache.carbondata.core.metadata.schema.table.CarbonTable;
 import org.apache.carbondata.core.scan.expression.Expression;
 import org.apache.carbondata.core.scan.model.CarbonQueryPlan;
 import org.apache.carbondata.core.scan.model.QueryModel;
+import org.apache.carbondata.core.util.DataTypeConverterImpl;
 import org.apache.carbondata.hadoop.util.CarbonInputFormatUtil;
 import org.apache.carbondata.presto.impl.CarbonTableCacheModel;
 import org.apache.carbondata.presto.impl.CarbonTableReader;
@@ -89,7 +90,7 @@ class CarbondataRecordSetProvider implements ConnectorRecordSetProvider {
 
     QueryModel queryModel = QueryModel
         .createModel(targetTable.getAbsoluteTableIdentifier(), queryPlan, targetTable,
-            new CarbonDataTypeConverterImpl());
+            new DataTypeConverterImpl());
 
     // Push down filter
     fillFilter2QueryModel(queryModel, carbondataSplit.getConstraints(), targetTable);
@@ -104,7 +105,7 @@ class CarbondataRecordSetProvider implements ConnectorRecordSetProvider {
       TupleDomain<ColumnHandle> originalConstraint, CarbonTable carbonTable) {
 
     Expression finalFilters =
-        CarbondataFilterUtil.getFilters(carbonTable.getFactTableName().hashCode());
+        PrestoFilterUtil.getFilters(carbonTable.getFactTableName().hashCode());
 
     // todo set into QueryModel
     CarbonInputFormatUtil.processFilterExpression(finalFilters, carbonTable);
