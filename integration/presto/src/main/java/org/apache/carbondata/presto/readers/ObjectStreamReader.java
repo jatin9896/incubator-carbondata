@@ -31,6 +31,13 @@ public class ObjectStreamReader implements StreamReader {
 
   private Object[] streamData;
 
+  /**
+   * this method read blocks from given type
+   *
+   * @param type
+   * @return
+   * @throws IOException
+   */
   public Block readBlock(Type type) throws IOException {
     int batchSize = streamData.length;
     BlockBuilder builder = type.createBlockBuilder(new BlockBuilderStatus(), batchSize);
@@ -42,6 +49,10 @@ public class ObjectStreamReader implements StreamReader {
     return builder.build();
   }
 
+  /** this method set the stream data
+   *
+   * @param streamData
+   */
   public void setStreamData(Object[] streamData) {
     this.streamData = streamData;
   }

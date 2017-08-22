@@ -17,8 +17,8 @@
 
 package org.apache.carbondata.presto;
 
-import java.util.List;
 import javax.inject.Inject;
+import java.util.List;
 
 import org.apache.carbondata.core.metadata.schema.table.CarbonTable;
 import org.apache.carbondata.core.scan.expression.Expression;
@@ -35,7 +35,6 @@ import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.RecordSet;
 import com.facebook.presto.spi.connector.ConnectorRecordSetProvider;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
-import com.facebook.presto.spi.predicate.TupleDomain;
 import com.google.common.collect.ImmutableList;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -64,17 +63,17 @@ class CarbondataRecordSetProvider implements ConnectorRecordSetProvider {
     checkArgument(carbondataSplit.getConnectorId().equals(connectorId),
         "split is not for this connector");
 
-    String targetCols = "";
+    StringBuffer targetCols = new StringBuffer("");
     // Convert all columns handles
     ImmutableList.Builder<CarbondataColumnHandle> handles = ImmutableList.builder();
     for (ColumnHandle handle : columns) {
       handles.add(checkType(handle, CarbondataColumnHandle.class, "handle"));
-      targetCols += ((CarbondataColumnHandle) handle).getColumnName() + ",";
+      targetCols.append(((CarbondataColumnHandle) handle).getColumnName()).append(",");
     }
 
     // Build column projection(check the column order)
     if (targetCols.length() > 0) {
-      targetCols = targetCols.substring(0, targetCols.length() - 1);
+      targetCols.append(targetCols.substring(0, targetCols.length() - 1));
     } else {
       targetCols = null;
     }
@@ -93,21 +92,24 @@ class CarbondataRecordSetProvider implements ConnectorRecordSetProvider {
             new DataTypeConverterImpl());
 
     // Push down filter
-    fillFilter2QueryModel(queryModel, carbondataSplit.getConstraints(), targetTable);
+    fillFilter2QueryModel(queryModel, targetTable);
 
     // Return new record set
     return new CarbondataRecordSet(targetTable, session, carbondataSplit, handles.build(),
         queryModel);
   }
 
-  // Build filter for QueryModel
-  private void fillFilter2QueryModel(QueryModel queryModel,
-      TupleDomain<ColumnHandle> originalConstraint, CarbonTable carbonTable) {
+  /**
+   * Build filter for QueryModel
+   *
+   * @param queryModel
+   * @param carbonTable
+   */
+  private void fillFilter2QueryModel(QueryModel queryModel, CarbonTable carbonTable) {
 
     Expression finalFilters =
         PrestoFilterUtil.getFilters(carbonTable.getFactTableName().hashCode());
 
-    // todo set into QueryModel
     CarbonInputFormatUtil.processFilterExpression(finalFilters, carbonTable);
     queryModel.setFilterExpressionResolverTree(
         CarbonInputFormatUtil.resolveFilter(finalFilters, queryModel.getAbsoluteTableIdentifier()));

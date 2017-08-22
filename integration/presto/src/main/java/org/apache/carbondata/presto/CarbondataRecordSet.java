@@ -26,10 +26,11 @@ import org.apache.carbondata.core.datastore.block.BlockletInfos;
 import org.apache.carbondata.core.datastore.block.TableBlockInfo;
 import org.apache.carbondata.core.metadata.ColumnarFormatVersion;
 import org.apache.carbondata.core.metadata.schema.table.CarbonTable;
-import org.apache.carbondata.presto.scan.executor.QueryExecutor;
 import org.apache.carbondata.core.scan.expression.Expression;
 import org.apache.carbondata.core.scan.model.QueryModel;
 import org.apache.carbondata.core.util.CarbonProperties;
+import org.apache.carbondata.presto.constants.PrestoCommonConstants;
+import org.apache.carbondata.presto.scan.executor.QueryExecutor;
 import org.apache.carbondata.presto.scan.executor.QueryExecutorFactory;
 
 import com.facebook.presto.spi.ColumnHandle;
@@ -46,7 +47,6 @@ class CarbondataRecordSet implements RecordSet {
 
   private CarbonTable carbonTable;
   private TupleDomain<ColumnHandle> originalConstraint;
-  private Expression carbonConstraint;
   private List<CarbondataColumnConstraint> rebuildConstraints;
   private QueryModel queryModel;
   private CarbondataSplit split;
@@ -91,7 +91,8 @@ class CarbondataRecordSet implements RecordSet {
     queryModel.setTableBlockInfos(tableBlockInfoList);
     queryExecutor = QueryExecutorFactory.getQueryExecutor(queryModel);
 
-    CarbonProperties.getInstance().addProperty("carbon.detail.batch.size", "4096");
+    CarbonProperties.getInstance().addProperty("carbon.detail.batch.size",
+        PrestoCommonConstants.COLUMNAR_DATA_READ_BATCH_SIZE);
 
     try {
       readSupport
@@ -99,6 +100,7 @@ class CarbondataRecordSet implements RecordSet {
       CarbonIterator carbonIterator = queryExecutor.execute(queryModel);
       return new CarbondataRecordCursor(readSupport, carbonIterator, columns);
     } catch (Exception ex) {
+      ex.printStackTrace();
       throw new RuntimeException(ex.getMessage(), ex);
     }
   }

@@ -27,7 +27,12 @@ import io.airlift.slice.Slice;
  * Based on type.
  */
 public final class StreamReaders {
-
+  /**
+   *
+   * @param type
+   * @param data
+   * @return StreamReader
+   */
   public static StreamReader createStreamReader(Type type, Object[] data) {
     Class<?> javaType = type.getJavaType();
     if (javaType == long.class) {

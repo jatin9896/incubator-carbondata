@@ -49,6 +49,13 @@ public class DecimalSliceStreamReader implements StreamReader {
 
   }
 
+  /**
+   * this method read blocks from given type
+   *
+   * @param type
+   * @return
+   * @throws IOException
+   */
   public Block readBlock(Type type) throws IOException {
     int batchSize = streamData.length;
     BlockBuilder builder = type.createBlockBuilder(new BlockBuilderStatus(), batchSize);
@@ -65,10 +72,20 @@ public class DecimalSliceStreamReader implements StreamReader {
     return builder.build();
   }
 
+  /** thsi method set the stream data
+   *
+   * @param streamData
+   */
   public void setStreamData(Object[] streamData) {
     this.streamData = streamData;
   }
 
+  /**
+   * this method get the slice for decimal type
+    * @param value
+   * @param type
+   * @return
+   */
   private Slice getSlice(Object value, Type type) {
     if (type instanceof DecimalType) {
       DecimalType actual = (DecimalType) type;

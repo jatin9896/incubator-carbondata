@@ -31,13 +31,14 @@ import static org.apache.carbondata.presto.constants.PrestoCommonConstants.COLUM
 /**
  * Below class will be used to process the block for detail query
  */
-public class DataBlockIteratorImpl extends CarbonDataBlockIterator {
+public class ColumnDataBlockIteratorImpl extends CarbonDataBlockIterator {
   /**
    * DataBlockIteratorImpl Constructor
    *
    * @param blockExecutionInfo execution information
    */
-  public DataBlockIteratorImpl(BlockExecutionInfo blockExecutionInfo, FileHolder fileReader,
+
+  public ColumnDataBlockIteratorImpl(BlockExecutionInfo blockExecutionInfo, FileHolder fileReader,
       int batchSize, QueryStatisticsModel queryStatisticsModel, ExecutorService executorService) {
     super(blockExecutionInfo, fileReader, batchSize, queryStatisticsModel, executorService);
   }

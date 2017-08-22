@@ -16,68 +16,24 @@
  */
 package org.apache.carbondata.presto.processor;
 
-import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.carbondata.common.CarbonIterator;
-import org.apache.carbondata.common.logging.LogService;
-import org.apache.carbondata.common.logging.LogServiceFactory;
-import org.apache.carbondata.core.datastore.DataRefNode;
 import org.apache.carbondata.core.datastore.FileHolder;
-import org.apache.carbondata.presto.scan.collector.ResultCollectorFactory;
-import org.apache.carbondata.core.scan.collector.ScannedResultCollector;
 import org.apache.carbondata.core.scan.executor.infos.BlockExecutionInfo;
+import org.apache.carbondata.core.scan.processor.AbstractDataBlockIterator;
 import org.apache.carbondata.core.scan.processor.BlockletIterator;
-import org.apache.carbondata.core.scan.processor.BlocksChunkHolder;
-import org.apache.carbondata.core.scan.result.AbstractScannedResult;
-import org.apache.carbondata.core.scan.result.vector.CarbonColumnarBatch;
-import org.apache.carbondata.core.scan.scanner.BlockletScanner;
 import org.apache.carbondata.core.scan.scanner.impl.FilterScanner;
 import org.apache.carbondata.core.scan.scanner.impl.NonFilterScanner;
 import org.apache.carbondata.core.stats.QueryStatisticsModel;
+import org.apache.carbondata.presto.scan.collector.ResultCollectorFactory;
 
 /**
  * This abstract class provides a skeletal implementation of the
  * Block iterator.
  */
-public abstract class CarbonDataBlockIterator extends CarbonIterator<List<Object[]>> {
-
-  private static final LogService LOGGER =
-      LogServiceFactory.getLogService(CarbonDataBlockIterator.class.getName());
-
-  /**
-   * iterator which will be used to iterate over data blocks
-   */
-  private CarbonIterator<DataRefNode> dataBlockIterator;
-
-  /**
-   * result collector which will be used to aggregate the scanned result
-   */
-  protected ScannedResultCollector scannerResultAggregator;
-
-  /**
-   * processor which will be used to process the block processing can be
-   * filter processing or non filter processing
-   */
-  private BlockletScanner blockletScanner;
-
-  /**
-   * batch size of result
-   */
-  protected int batchSize;
-
-  protected ExecutorService executorService;
-
-  private Future<AbstractScannedResult> future;
-
-  private Future<BlocksChunkHolder> futureIo;
-
-  protected AbstractScannedResult scannedResult;
+public abstract class CarbonDataBlockIterator extends AbstractDataBlockIterator {
 
   private BlockExecutionInfo blockExecutionInfo;
 
@@ -89,6 +45,7 @@ public abstract class CarbonDataBlockIterator extends CarbonIterator<List<Object
 
   public CarbonDataBlockIterator(BlockExecutionInfo blockExecutionInfo, FileHolder fileReader,
       int batchSize, QueryStatisticsModel queryStatisticsModel, ExecutorService executorService) {
+    super(blockExecutionInfo, fileReader, batchSize, queryStatisticsModel,  executorService);
     this.blockExecutionInfo = blockExecutionInfo;
     this.fileReader = fileReader;
     dataBlockIterator = new BlockletIterator(blockExecutionInfo.getFirstDataBlock(),
@@ -106,134 +63,7 @@ public abstract class CarbonDataBlockIterator extends CarbonIterator<List<Object
     this.nextRead = new AtomicBoolean(false);
   }
 
-  public boolean hasNext() {
-    if (scannedResult != null && scannedResult.hasNext()) {
-      return true;
-    } else {
-      if (null != scannedResult) {
-        scannedResult.freeMemory();
-      }
-      return dataBlockIterator.hasNext() || nextBlock.get() || nextRead.get();
-    }
-  }
-
-  protected boolean updateScanner() {
-    try {
-      if (scannedResult != null && scannedResult.hasNext()) {
-        return true;
-      } else {
-        scannedResult = getNextScannedResult();
-        while (scannedResult != null) {
-          if (scannedResult.hasNext()) {
-            return true;
-          }
-          scannedResult = getNextScannedResult();
-        }
-        nextBlock.set(false);
-        nextRead.set(false);
-        return false;
-      }
-    } catch (Exception ex) {
-      throw new RuntimeException(ex);
-    }
-  }
-
-  private AbstractScannedResult getNextScannedResult() throws Exception {
-    AbstractScannedResult result = null;
-    if (dataBlockIterator.hasNext() || nextBlock.get() || nextRead.get()) {
-      if (future == null) {
-        future = execute();
-      }
-      result = future.get();
-      nextBlock.set(false);
-      if (dataBlockIterator.hasNext() || nextRead.get()) {
-        nextBlock.set(true);
-        future = execute();
-      }
-    }
-    return result;
-  }
-
-  private BlocksChunkHolder getBlocksChunkHolder() throws IOException {
-    BlocksChunkHolder blocksChunkHolder = getBlocksChunkHolderInternal();
-    while (blocksChunkHolder == null && dataBlockIterator.hasNext()) {
-      blocksChunkHolder = getBlocksChunkHolderInternal();
-    }
-    return blocksChunkHolder;
-  }
-
-  private BlocksChunkHolder getBlocksChunkHolderInternal() throws IOException {
-    BlocksChunkHolder blocksChunkHolder =
-        new BlocksChunkHolder(blockExecutionInfo.getTotalNumberDimensionBlock(),
-            blockExecutionInfo.getTotalNumberOfMeasureBlock(), fileReader);
-    blocksChunkHolder.setDataBlock(dataBlockIterator.next());
-    if (blocksChunkHolder.getDataBlock().getColumnsMaxValue() == null) {
-      return blocksChunkHolder;
-    }
-    if (blockletScanner.isScanRequired(blocksChunkHolder)) {
-      return blocksChunkHolder;
-    }
-    return null;
-  }
-
-  private Future<AbstractScannedResult> execute() {
-    return executorService.submit(new Callable<AbstractScannedResult>() {
-      @Override public AbstractScannedResult call() throws Exception {
-        if (futureIo == null) {
-          futureIo = executeRead();
-        }
-        BlocksChunkHolder blocksChunkHolder = futureIo.get();
-        futureIo = null;
-        nextRead.set(false);
-        if (blocksChunkHolder != null) {
-          if (dataBlockIterator.hasNext()) {
-            nextRead.set(true);
-            futureIo = executeRead();
-          }
-          return blockletScanner.scanBlocklet(blocksChunkHolder);
-        }
-        return null;
-      }
-    });
-  }
-
-  private Future<BlocksChunkHolder> executeRead() {
-    return executorService.submit(new Callable<BlocksChunkHolder>() {
-      @Override public BlocksChunkHolder call() throws Exception {
-        if (dataBlockIterator.hasNext()) {
-          BlocksChunkHolder blocksChunkHolder = getBlocksChunkHolder();
-          if (blocksChunkHolder != null) {
-            blockletScanner.readBlocklet(blocksChunkHolder);
-            return blocksChunkHolder;
-          }
-        }
-        return null;
-      }
-    });
-  }
-
-  public abstract void processNextBatch(CarbonColumnarBatch columnarBatch);
-
   public abstract List<Object[]>  processNextColumnBatch();
 
-  /**
-   * Close the resources
-   */
-  public void close() {
-    // free the current scanned result
-    if (null != scannedResult && !scannedResult.hasNext()) {
-      scannedResult.freeMemory();
-    }
-    // free any pre-fetched memory if present
-    if (null != future) {
-      try {
-        AbstractScannedResult abstractScannedResult = future.get();
-        if (abstractScannedResult != null) {
-          abstractScannedResult.freeMemory();
-        }
-      } catch (InterruptedException | ExecutionException e) {
-        throw new RuntimeException(e);
-      }
-    }
-  }
+
 }

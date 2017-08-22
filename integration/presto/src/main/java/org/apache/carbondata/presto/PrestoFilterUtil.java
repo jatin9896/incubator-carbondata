@@ -226,6 +226,9 @@ public class PrestoFilterUtil {
     return rawdata;
   }
 
+  /**
+   * get the filters from key
+   */
   static Expression getFilters(Integer key) {
     return filterMap.get(key);
   }

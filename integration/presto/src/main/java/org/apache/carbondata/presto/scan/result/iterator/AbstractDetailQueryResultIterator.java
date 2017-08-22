@@ -44,7 +44,7 @@ import org.apache.carbondata.core.stats.QueryStatisticsConstants;
 import org.apache.carbondata.core.stats.QueryStatisticsModel;
 import org.apache.carbondata.core.stats.QueryStatisticsRecorder;
 import org.apache.carbondata.core.util.CarbonProperties;
-import org.apache.carbondata.presto.processor.impl.DataBlockIteratorImpl;
+import org.apache.carbondata.presto.processor.impl.ColumnDataBlockIteratorImpl;
 
 /**
  * In case of detail query we cannot keep all the records in memory so for
@@ -57,10 +57,10 @@ public abstract class AbstractDetailQueryResultIterator<E> extends CarbonIterato
      * LOGGER.
      */
     private static final LogService LOGGER =
-            LogServiceFactory.getLogService(AbstractDetailQueryResultIterator.class.getName());
+        LogServiceFactory.getLogService(AbstractDetailQueryResultIterator.class.getName());
 
     private static final Map<DeleteDeltaInfo, Object> deleteDeltaToLockObjectMap =
-            new ConcurrentHashMap<>();
+        new ConcurrentHashMap<>();
 
     protected ExecutorService execService;
     /**
@@ -73,7 +73,7 @@ public abstract class AbstractDetailQueryResultIterator<E> extends CarbonIterato
      */
     protected FileHolder fileReader;
 
-    protected DataBlockIteratorImpl dataBlockIterator;
+    protected ColumnDataBlockIteratorImpl dataBlockIterator;
 
     /**
      * QueryStatisticsRecorder
@@ -89,9 +89,9 @@ public abstract class AbstractDetailQueryResultIterator<E> extends CarbonIterato
     private QueryStatisticsModel queryStatisticsModel;
 
     public AbstractDetailQueryResultIterator(List<BlockExecutionInfo> infos, QueryModel queryModel,
-                                             ExecutorService execService) {
+        ExecutorService execService) {
         String batchSizeString =
-                CarbonProperties.getInstance().getProperty(CarbonCommonConstants.DETAIL_QUERY_BATCH_SIZE);
+            CarbonProperties.getInstance().getProperty(CarbonCommonConstants.DETAIL_QUERY_BATCH_SIZE);
         if (null != batchSizeString) {
             try {
                 batchSize = Integer.parseInt(batchSizeString);
@@ -105,7 +105,7 @@ public abstract class AbstractDetailQueryResultIterator<E> extends CarbonIterato
         this.recorder = queryModel.getStatisticsRecorder();
         this.blockExecutionInfos = infos;
         this.fileReader = FileFactory.getFileHolder(
-                FileFactory.getFileType(queryModel.getAbsoluteTableIdentifier().getStorePath()));
+            FileFactory.getFileType(queryModel.getAbsoluteTableIdentifier().getStorePath()));
         this.fileReader.setQueryId(queryModel.getQueryId());
         this.execService = execService;
         intialiseInfos();
@@ -116,11 +116,11 @@ public abstract class AbstractDetailQueryResultIterator<E> extends CarbonIterato
         for (BlockExecutionInfo blockInfo : blockExecutionInfos) {
             Map<String, DeleteDeltaVo> deletedRowsMap = null;
             DataRefNodeFinder finder = new BTreeDataRefNodeFinder(blockInfo.getEachColumnValueSize(),
-                    blockInfo.getDataBlock().getSegmentProperties().getNumberOfSortColumns(),
-                    blockInfo.getDataBlock().getSegmentProperties().getNumberOfNoDictSortColumns());
+                blockInfo.getDataBlock().getSegmentProperties().getNumberOfSortColumns(),
+                blockInfo.getDataBlock().getSegmentProperties().getNumberOfNoDictSortColumns());
             // if delete delta file is present
             if (null != blockInfo.getDeleteDeltaFilePath() && 0 != blockInfo
-                    .getDeleteDeltaFilePath().length) {
+                .getDeleteDeltaFilePath().length) {
                 DeleteDeltaInfo deleteDeltaInfo = new DeleteDeltaInfo(blockInfo.getDeleteDeltaFilePath());
                 // read and get the delete detail block details
                 deletedRowsMap = getDeleteDeltaDetails(blockInfo.getDataBlock(), deleteDeltaInfo);
@@ -135,7 +135,7 @@ public abstract class AbstractDetailQueryResultIterator<E> extends CarbonIterato
 
             } else {
                 DataRefNode startDataBlock =
-                        finder.findFirstDataBlock(dataRefNode, blockInfo.getStartKey());
+                    finder.findFirstDataBlock(dataRefNode, blockInfo.getStartKey());
                 while (startDataBlock.nodeNumber() < blockInfo.getStartBlockletIndex()) {
                     startDataBlock = startDataBlock.getNextDataRefNode();
                 }
@@ -159,11 +159,11 @@ public abstract class AbstractDetailQueryResultIterator<E> extends CarbonIterato
      * @return blockid+pageid to deleted row mapping
      */
     private Map<String, DeleteDeltaVo> getDeleteDeltaDetails(AbstractIndex dataBlock,
-                                                             DeleteDeltaInfo deleteDeltaInfo) {
+        DeleteDeltaInfo deleteDeltaInfo) {
         // if datablock deleted delta timestamp is more then the current delete delta files timestamp
         // then return the current deleted rows
         if (dataBlock.getDeleteDeltaTimestamp() >= deleteDeltaInfo
-                .getLatestDeleteDeltaFileTimestamp()) {
+            .getLatestDeleteDeltaFileTimestamp()) {
             return dataBlock.getDeletedRowsMap();
         }
         CarbonDeleteFilesDataReader carbonDeleteDeltaFileReader = null;
@@ -187,11 +187,11 @@ public abstract class AbstractDetailQueryResultIterator<E> extends CarbonIterato
             synchronized (lockObject) {
                 // check the timestamp again
                 if (dataBlock.getDeleteDeltaTimestamp() < deleteDeltaInfo
-                        .getLatestDeleteDeltaFileTimestamp()) {
+                    .getLatestDeleteDeltaFileTimestamp()) {
                     // read the delete delta files
                     carbonDeleteDeltaFileReader = new CarbonDeleteFilesDataReader();
                     Map<String, DeleteDeltaVo> deletedRowsMap = carbonDeleteDeltaFileReader
-                            .getDeletedRowsDataVo(deleteDeltaInfo.getDeleteDeltaFile());
+                        .getDeletedRowsDataVo(deleteDeltaInfo.getDeleteDeltaFile());
                     setDeltedDeltaBoToDataBlock(deleteDeltaInfo, deletedRowsMap, dataBlock);
                     // remove the lock
                     deleteDeltaToLockObjectMap.remove(deleteDeltaInfo);
@@ -214,13 +214,13 @@ public abstract class AbstractDetailQueryResultIterator<E> extends CarbonIterato
      * @param dataBlock
      */
     private void setDeltedDeltaBoToDataBlock(DeleteDeltaInfo deleteDeltaInfo,
-                                             Map<String, DeleteDeltaVo> deletedRecordsMap, AbstractIndex dataBlock) {
+        Map<String, DeleteDeltaVo> deletedRecordsMap, AbstractIndex dataBlock) {
         // check if timestamp of data block is less than the latest delete delta timestamp
         // then update the delete delta details and timestamp in data block
         if (dataBlock.getDeleteDeltaTimestamp() < deleteDeltaInfo.getLatestDeleteDeltaFileTimestamp()) {
             synchronized (dataBlock) {
                 if (dataBlock.getDeleteDeltaTimestamp() < deleteDeltaInfo
-                        .getLatestDeleteDeltaFileTimestamp()) {
+                    .getLatestDeleteDeltaFileTimestamp()) {
                     dataBlock.setDeletedRowsMap(deletedRecordsMap);
                     dataBlock.setDeleteDeltaTimestamp(deleteDeltaInfo.getLatestDeleteDeltaFileTimestamp());
                 }
@@ -247,12 +247,12 @@ public abstract class AbstractDetailQueryResultIterator<E> extends CarbonIterato
         }
     }
 
-    private DataBlockIteratorImpl getDataBlockIterator() {
+    private ColumnDataBlockIteratorImpl getDataBlockIterator() {
         if (blockExecutionInfos.size() > 0) {
             BlockExecutionInfo executionInfo = blockExecutionInfos.get(0);
             blockExecutionInfos.remove(executionInfo);
-            return new DataBlockIteratorImpl(executionInfo, fileReader, batchSize, queryStatisticsModel,
-                    execService);
+            return new ColumnDataBlockIteratorImpl(executionInfo, fileReader, batchSize, queryStatisticsModel,
+                execService);
         }
         return null;
     }
@@ -262,37 +262,37 @@ public abstract class AbstractDetailQueryResultIterator<E> extends CarbonIterato
         this.queryStatisticsModel.setRecorder(recorder);
         QueryStatistic queryStatisticTotalBlocklet = new QueryStatistic();
         queryStatisticsModel.getStatisticsTypeAndObjMap()
-                .put(QueryStatisticsConstants.TOTAL_BLOCKLET_NUM, queryStatisticTotalBlocklet);
+            .put(QueryStatisticsConstants.TOTAL_BLOCKLET_NUM, queryStatisticTotalBlocklet);
         queryStatisticsModel.getRecorder().recordStatistics(queryStatisticTotalBlocklet);
 
         QueryStatistic queryStatisticValidScanBlocklet = new QueryStatistic();
         queryStatisticsModel.getStatisticsTypeAndObjMap()
-                .put(QueryStatisticsConstants.VALID_SCAN_BLOCKLET_NUM, queryStatisticValidScanBlocklet);
+            .put(QueryStatisticsConstants.VALID_SCAN_BLOCKLET_NUM, queryStatisticValidScanBlocklet);
         queryStatisticsModel.getRecorder().recordStatistics(queryStatisticValidScanBlocklet);
 
         QueryStatistic totalNumberOfPages = new QueryStatistic();
         queryStatisticsModel.getStatisticsTypeAndObjMap()
-                .put(QueryStatisticsConstants.TOTAL_PAGE_SCANNED, totalNumberOfPages);
+            .put(QueryStatisticsConstants.TOTAL_PAGE_SCANNED, totalNumberOfPages);
         queryStatisticsModel.getRecorder().recordStatistics(totalNumberOfPages);
 
         QueryStatistic validPages = new QueryStatistic();
         queryStatisticsModel.getStatisticsTypeAndObjMap()
-                .put(QueryStatisticsConstants.VALID_PAGE_SCANNED, validPages);
+            .put(QueryStatisticsConstants.VALID_PAGE_SCANNED, validPages);
         queryStatisticsModel.getRecorder().recordStatistics(validPages);
 
         QueryStatistic scannedPages = new QueryStatistic();
         queryStatisticsModel.getStatisticsTypeAndObjMap()
-                .put(QueryStatisticsConstants.PAGE_SCANNED, scannedPages);
+            .put(QueryStatisticsConstants.PAGE_SCANNED, scannedPages);
         queryStatisticsModel.getRecorder().recordStatistics(scannedPages);
 
         QueryStatistic scanTime = new QueryStatistic();
         queryStatisticsModel.getStatisticsTypeAndObjMap()
-                .put(QueryStatisticsConstants.SCAN_BLOCKlET_TIME, scanTime);
+            .put(QueryStatisticsConstants.SCAN_BLOCKlET_TIME, scanTime);
         queryStatisticsModel.getRecorder().recordStatistics(scanTime);
 
         QueryStatistic readTime = new QueryStatistic();
         queryStatisticsModel.getStatisticsTypeAndObjMap()
-                .put(QueryStatisticsConstants.READ_BLOCKlET_TIME, readTime);
+            .put(QueryStatisticsConstants.READ_BLOCKlET_TIME, readTime);
         queryStatisticsModel.getRecorder().recordStatistics(readTime);
     }
 

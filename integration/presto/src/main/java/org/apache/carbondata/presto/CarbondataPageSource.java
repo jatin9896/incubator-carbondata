@@ -22,10 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.carbondata.common.CarbonIterator;
-import org.apache.carbondata.common.logging.LogService;
-import org.apache.carbondata.common.logging.LogServiceFactory;
 import org.apache.carbondata.core.scan.result.BatchResult;
-import org.apache.carbondata.presto.memory.AggregatedMemoryContext;
 import org.apache.carbondata.presto.readers.StreamReader;
 import org.apache.carbondata.presto.readers.StreamReaders;
 import org.apache.carbondata.processing.newflow.exception.CarbonDataLoadingException;
@@ -51,33 +48,26 @@ import static java.util.Objects.requireNonNull;
  */
 class CarbondataPageSource implements ConnectorPageSource {
 
-  private static final LogService logger =
-      LogServiceFactory.getLogService(CarbondataPageSource.class.getName());
   private final RecordCursor cursor;
   private final List<Type> types;
   private final PageBuilder pageBuilder;
-  private final AggregatedMemoryContext systemMemoryContext;
   private final StreamReader[] readers;
   private boolean closed;
   private CarbonIterator<BatchResult> columnCursor;
   private CarbonDictionaryDecodeReadSupport<Object[]> readSupport;
   private long sizeOfData = 0;
   private int batchId;
-  private int noOfPages;
 
-  CarbondataPageSource(RecordSet recordSet, AggregatedMemoryContext systemMemoryContext) {
-    this(requireNonNull(recordSet, "recordSet is null").getColumnTypes(), recordSet.cursor(),
-        systemMemoryContext);
+  public CarbondataPageSource(RecordSet recordSet) {
+    this(requireNonNull(recordSet, "recordSet is null").getColumnTypes(), recordSet.cursor());
   }
 
-  private CarbondataPageSource(List<Type> types, RecordCursor cursor,
-      AggregatedMemoryContext systemMemoryContext) {
+  private CarbondataPageSource(List<Type> types, RecordCursor cursor) {
     this.cursor = requireNonNull(cursor, "cursor is null");
     this.types = unmodifiableList(new ArrayList<>(requireNonNull(types, "types is null")));
     this.pageBuilder = new PageBuilder(this.types);
     this.columnCursor = ((CarbondataRecordCursor) cursor).getColumnCursor();
     this.readSupport = ((CarbondataRecordCursor) cursor).getReadSupport();
-    this.systemMemoryContext = systemMemoryContext;
     this.readers = createStreamReaders();
   }
 
@@ -101,7 +91,6 @@ class CarbondataPageSource implements ConnectorPageSource {
 
     BatchResult columnBatch;
     List<Object[]> columnData;
-    noOfPages++;
     int batchSize = 0;
     try {
       batchId++;
@@ -164,6 +153,11 @@ class CarbondataPageSource implements ConnectorPageSource {
 
   }
 
+  /**
+   * Method added to suppress the excecption
+   *
+   * @param throwable
+   */
   private void closeWithSuppression(Throwable throwable) {
     requireNonNull(throwable, "throwable is null");
     try {
@@ -176,6 +170,12 @@ class CarbondataPageSource implements ConnectorPageSource {
     }
   }
 
+  /**
+   * Create the Stream Reader for every column based on their type
+   * This method will be initialized only once based on the types.
+   *
+   * @return
+   */
   private StreamReader[] createStreamReaders() {
     requireNonNull(types);
     StreamReader[] readers = new StreamReader[types.size()];
@@ -185,6 +185,9 @@ class CarbondataPageSource implements ConnectorPageSource {
     return readers;
   }
 
+  /**
+   * Implemented the lazy Blocks for efficiency in data exchange
+   */
   private final class CarbondataBlockLoader implements LazyBlockLoader<LazyBlock> {
     private final int expectedBatchId = batchId;
     private final int columnIndex;
