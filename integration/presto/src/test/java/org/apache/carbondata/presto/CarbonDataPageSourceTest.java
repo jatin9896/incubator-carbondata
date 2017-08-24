@@ -6,6 +6,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
+import com.facebook.presto.spi.type.VarcharType;
+import com.sun.tools.doclets.formats.html.SourceToHTMLConverter;
 import org.apache.carbondata.common.CarbonIterator;
 import org.apache.carbondata.core.metadata.AbsoluteTableIdentifier;
 import org.apache.carbondata.core.metadata.CarbonTableIdentifier;
@@ -17,15 +19,16 @@ import org.apache.carbondata.core.metadata.schema.table.column.ColumnSchema;
 import org.apache.carbondata.core.scan.executor.infos.BlockExecutionInfo;
 import org.apache.carbondata.core.scan.model.QueryDimension;
 import org.apache.carbondata.core.scan.model.QueryModel;
+import org.apache.carbondata.core.scan.processor.impl.DataBlockIteratorImpl;
 import org.apache.carbondata.core.scan.result.BatchResult;
+import org.apache.carbondata.core.scan.result.iterator.AbstractDetailQueryResultIterator;
 import org.apache.carbondata.presto.impl.CarbonLocalInputSplit;
 import org.apache.carbondata.presto.processor.CarbonDataBlockIterator;
 import org.apache.carbondata.presto.processor.impl.ColumnBasedResultCollector;
-import org.apache.carbondata.presto.processor.impl.DataBlockIteratorImpl;
+
+import org.apache.carbondata.presto.processor.impl.ColumnDataBlockIteratorImpl;
 import org.apache.carbondata.presto.scan.executor.impl.ColumnDetailQueryExecutor;
 import org.apache.carbondata.presto.scan.result.ColumnBasedResultIterator;
-import org.apache.carbondata.presto.scan.result.iterator.AbstractDetailQueryResultIterator;
-
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.predicate.Domain;
@@ -39,7 +42,6 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertNotNull;
 
 public class CarbonDataPageSourceTest {
@@ -86,6 +88,11 @@ public class CarbonDataPageSourceTest {
     List constraintsList = new ArrayList<CarbondataColumnConstraint>();
     constraintsList.add(constraints);
     queryModel = new QueryModel();
+    new MockUp<ColumnBasedResultCollector>() {
+      @Mock private void initDimensionAndMeasureIndexesForFillingData() {
+      }
+    };
+
     new MockUp<ColumnDetailQueryExecutor>() {
       @Mock public CarbonIterator execute(QueryModel queryModel) {
         blockExecutionInfo = new BlockExecutionInfo();
@@ -95,7 +102,7 @@ public class CarbonDataPageSourceTest {
         return new ColumnBasedResultIterator(blockExecutionInfos, queryModel, executorService);
       }
     };
-    new MockUp<DataBlockIteratorImpl>() {
+    new MockUp<ColumnDataBlockIteratorImpl>() {
       @Mock public List<Object[]> processNextColumnBatch() {
         Object[] object = new Object[] { 4 };
         List<Object[]> resultList = new ArrayList();
@@ -107,7 +114,6 @@ public class CarbonDataPageSourceTest {
     new MockUp<CarbonDataBlockIterator>() {
       @Mock protected boolean updateScanner() {
         return true;
-
       }
     };
     new MockUp<BlockExecutionInfo>() {
@@ -123,25 +129,25 @@ public class CarbonDataPageSourceTest {
 
       }
     };
+
+    split = new CarbondataSplit("conid", schemaTable, domain, localSplits, constraintsList);
+    carbonTableIdentifier = new CarbonTableIdentifier("default", "emp", "1");
+    queryModel
+        .setAbsoluteTableIdentifier(new AbsoluteTableIdentifier("/default", carbonTableIdentifier));
+  }
+
+  @Test() public void testGenNextPage() {
     new MockUp<AbstractDetailQueryResultIterator>() {
       @Mock private void intialiseInfos() {
 
       }
 
-      @Mock protected void initQueryStatiticsModel() {
-
-      }
     };
-    split = new CarbondataSplit("conid", schemaTable, domain, localSplits, constraintsList);
-    carbonTableIdentifier = new CarbonTableIdentifier("default", "emp", "1");
-    queryModel
-        .setAbsoluteTableIdentifier(new AbsoluteTableIdentifier("/default", carbonTableIdentifier));
+    new MockUp<ColumnBasedResultIterator>(){
+     @Mock protected void initQueryStatiticsModel() {
 
-
-
-  }
-
-  @Test(expected=RuntimeException.class) public void testGenNextPage() {
+     }
+    };
     //case when type is not specified
     carbondataRecordSet =
             new CarbondataRecordSet(carbonTable, null, split, new ArrayList<CarbondataColumnHandle>(),
@@ -149,6 +155,19 @@ public class CarbonDataPageSourceTest {
     carbonPage = new CarbondataPageSource(carbondataRecordSet);
     assertNotNull(carbonPage.getNextPage());
 
+    }
+  @Test() public void testNextPage() {
+    new MockUp<AbstractDetailQueryResultIterator>() {
+      @Mock private void intialiseInfos() {
+
+      }
+
+    };
+    new MockUp<ColumnBasedResultIterator>(){
+      @Mock protected void initQueryStatiticsModel() {
+
+      }
+    };
     //when type is specified but column batch is null
     new MockUp<ColumnSchema>() {
       @Mock
@@ -156,37 +175,47 @@ public class CarbonDataPageSourceTest {
         return DataType.INT;
       }
     };
-    new MockUp<DataBlockIteratorImpl>() {
-      @Mock
-      public List<Object[]> processNextColumnBatch() {
-        Object[] object = new Object[]{4};
-        List<Object[]> resultList = new ArrayList();
-        resultList.add(object);
-        return resultList;
-
+    new MockUp<ColumnBasedResultIterator>(){
+      @Mock public BatchResult next() {
+        return new BatchResult();
       }
     };
-    ColumnSchema columnSchema = new ColumnSchema();
-    Type spiType = CarbondataMetadata.carbonDataType2SpiMapper(columnSchema);
+    new MockUp<BatchResult>(){
+     @Mock List<Object[]> getRows(){
+        List stringData=new ArrayList<String>();
+        stringData.add(new String("abc"));
+        stringData.add(new String("hello"));
+        return stringData;
+      }
+
+      @Mock public int getSize(){
+       return 2;
+      }
+    };
+
+    Type spiType = VarcharType.VARCHAR;
     carbondataColumnHandle =
             new CarbondataColumnHandle("connectorId", "id", spiType, 0, 3, 1, true, 1, "int", true, 5,
                     4);
     List<CarbondataColumnHandle> carbonColumnHandles = new ArrayList<>();
     carbonColumnHandles.add(carbondataColumnHandle);
-    // carbonColumnHandles.add(carbondataColumnHandle);
+    carbonColumnHandles.add(carbondataColumnHandle);
     carbondataRecordSet =
             new CarbondataRecordSet(carbonTable, null, split, carbonColumnHandles, queryModel);
     carbonPage = new CarbondataPageSource(carbondataRecordSet);
     assertNotNull(carbonPage.getNextPage());
+
+  }
+  @Test(expected=RuntimeException.class) public void exceptionalTest(){
     new MockUp<BatchResult>() {
-     @Mock public List<Object[]> getRows() {
+      @Mock public List<Object[]> getRows() {
         throw new RuntimeException("Unable to fetch Row");
       }
     };
     carbonPage.getNextPage();
   }
-  @AfterClass public static void tearDown(){
+  /*@AfterClass public static void tearDown(){
     carbonPage.close();
-  }
+  }*/
 }
 

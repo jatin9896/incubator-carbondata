@@ -133,9 +133,7 @@ public class CarbonDataRecordSetProviderTest {
                 return cache;
             }
         };
-        new MockUp<CarbonTableReader>() {
 
-        };
         RecordSet rs = carbonRecordSetProvider.getRecordSet(CarbondataTransactionHandle.INSTANCE, SESSION, split, carbonColumnHandles);
 
         assertTrue(rs instanceof CarbondataRecordSet);
