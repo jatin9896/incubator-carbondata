@@ -134,6 +134,14 @@ public class CarbonTableReader {
     this.cc = new ConcurrentHashMap<>();
   }
 
+  public CarbonFile getCarbonFileList() {
+    return carbonFileList;
+  }
+
+  public void setCarbonFileList(CarbonFile carbonFileList) {
+    this.carbonFileList = carbonFileList;
+  }
+
   /**
    * For presto worker node to initialize the metadata cache of a table.
    *

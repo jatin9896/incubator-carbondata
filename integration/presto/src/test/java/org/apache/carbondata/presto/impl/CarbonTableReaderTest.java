@@ -5,6 +5,7 @@ import com.facebook.presto.spi.TableNotFoundException;
 import com.google.gson.Gson;
 import mockit.Mock;
 import mockit.MockUp;
+import org.apache.carbondata.core.cache.dictionary.DictionaryColumnUniqueIdentifier;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
 import org.apache.carbondata.core.datastore.*;
 import org.apache.carbondata.core.datastore.block.*;
@@ -37,6 +38,7 @@ import org.apache.carbondata.core.scan.expression.Expression;
 import org.apache.carbondata.core.scan.expression.LiteralExpression;
 import org.apache.carbondata.core.scan.expression.logical.AndExpression;
 import org.apache.carbondata.core.scan.filter.FilterExpressionProcessor;
+import org.apache.carbondata.core.scan.filter.TableProvider;
 import org.apache.carbondata.core.scan.filter.resolver.ConditionalFilterResolverImpl;
 import org.apache.carbondata.core.scan.filter.resolver.FilterResolverIntf;
 import org.apache.carbondata.core.service.impl.PathFactory;
@@ -257,7 +259,7 @@ public class CarbonTableReaderTest {
         new MockUp<PathFactory>() {
             @Mock
             public CarbonTablePath getCarbonTablePath(
-                    String storeLocation, CarbonTableIdentifier tableIdentifier) {
+                    String storeLocation, CarbonTableIdentifier tableIdentifier, DictionaryColumnUniqueIdentifier dictionaryColumnUniqueIdentifier) {
 
                 return new CarbonTablePath("storePath", "schemaName", "tableName");
             }
@@ -282,7 +284,7 @@ public class CarbonTableReaderTest {
             }
 
         };
-        CarbonTableCacheModel carbonTableCacheModel = carbonTableReader.getCarbonCache(new SchemaTableName("schemaName", "tableName"));
+        carbonTableReader.getCarbonCache(new SchemaTableName("schemaName", "tableName"));
     }
 
     @Test
@@ -368,7 +370,7 @@ public class CarbonTableReaderTest {
         new MockUp<PathFactory>() {
             @Mock
             public CarbonTablePath getCarbonTablePath(
-                    String storeLocation, CarbonTableIdentifier tableIdentifier) {
+                    String storeLocation, CarbonTableIdentifier tableIdentifier, DictionaryColumnUniqueIdentifier dictionaryColumnUniqueIdentifier) {
 
                 return new CarbonTablePath("storePath", "schemaName", "tableName");
             }
@@ -451,7 +453,7 @@ public class CarbonTableReaderTest {
         new MockUp<CarbonInputFormatUtil>() {
             @Mock
             public FilterResolverIntf resolveFilter(Expression filterExpression,
-                                                    AbsoluteTableIdentifier absoluteTableIdentifier) {
+                                                    AbsoluteTableIdentifier absoluteTableIdentifier, TableProvider tableProvider) {
                 return new ConditionalFilterResolverImpl(inputFilter, true, false, new AbsoluteTableIdentifier("/storePath", new CarbonTableIdentifier("schemaName", "tableName", "tableId")), false);
             }
         };
@@ -515,7 +517,7 @@ public class CarbonTableReaderTest {
         new MockUp<CarbonInputFormatUtil>() {
             @Mock
             public FilterResolverIntf resolveFilter(Expression filterExpression,
-                                                    AbsoluteTableIdentifier absoluteTableIdentifier) {
+                                                    AbsoluteTableIdentifier absoluteTableIdentifier, TableProvider tableProvider) {
                 return new ConditionalFilterResolverImpl(inputFilter, true, false, new AbsoluteTableIdentifier("/storePath", new CarbonTableIdentifier("schemaName", "tableName", "tableId")), false);
             }
         };
@@ -628,7 +630,7 @@ public class CarbonTableReaderTest {
         new MockUp<CarbonInputFormatUtil>() {
             @Mock
             public FilterResolverIntf resolveFilter(Expression filterExpression,
-                                                    AbsoluteTableIdentifier absoluteTableIdentifier) {
+                                                    AbsoluteTableIdentifier absoluteTableIdentifier, TableProvider tableProvider) {
                 return null;
             }
         };
