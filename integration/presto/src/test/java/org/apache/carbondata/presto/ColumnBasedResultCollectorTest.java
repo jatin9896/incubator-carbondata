@@ -111,8 +111,33 @@ public class ColumnBasedResultCollectorTest {
             }
         };
 
-        List data = columnBasedResultCollector.collectData(nonFilterQueryScannedResult, 2);
+      /*  List data = columnBasedResultCollector.collectData(nonFilterQueryScannedResult, 2);
 
         assertTrue(data instanceof List);
+        new MockUp<NonFilterQueryScannedResult>(){
+            @Mock  public boolean hasNext() {
+                return false;
+            }
+        };
+        List data1 = columnBasedResultCollector.collectData(nonFilterQueryScannedResult, 2);
+        assertTrue(data1 instanceof List);*/
+      new MockUp<AbstractScannedResult>(){
+         @Mock public void incrementCounter(){
+
+          }
+      };
+        QueryDimension queryDimension1=new QueryDimension("dimmensionColumn");
+        QueryDimension emptyQueryDimensions[]=new QueryDimension[0];
+        QueryMeasure emptyQueryMeasures[]=new QueryMeasure[0];
+        BlockExecutionInfo emptyBlockExecutionInfo = new BlockExecutionInfo();
+        emptyBlockExecutionInfo.setQueryMeasures(emptyQueryMeasures);
+        emptyBlockExecutionInfo.setQueryDimensions(emptyQueryDimensions);
+        ColumnBasedResultCollector emptyColumnBasedResultCollector = new ColumnBasedResultCollector(emptyBlockExecutionInfo);
+        NonFilterQueryScannedResult emptyNonFilterQueryScannedResult = new NonFilterQueryScannedResult(emptyBlockExecutionInfo);
+        List data2 = emptyColumnBasedResultCollector.collectData(emptyNonFilterQueryScannedResult, 2);
+        assertTrue(data2 instanceof List);
+
+
+
     }
 }

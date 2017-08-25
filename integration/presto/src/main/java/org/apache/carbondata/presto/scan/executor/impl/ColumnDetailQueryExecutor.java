@@ -8,7 +8,6 @@ import org.apache.carbondata.core.scan.executor.QueryExecutor;
 import org.apache.carbondata.core.scan.executor.exception.QueryExecutionException;
 import org.apache.carbondata.core.scan.executor.impl.AbstractQueryExecutor;
 import org.apache.carbondata.core.scan.model.QueryModel;
-import org.apache.carbondata.presto.scan.executor.QueryExecutor;
 import org.apache.carbondata.presto.scan.result.ColumnBasedResultIterator;
 
 public class ColumnDetailQueryExecutor extends AbstractQueryExecutor implements QueryExecutor {
