@@ -17,7 +17,7 @@
     under the License.
 -->
 
-# CarbonData Partition Table Guidance
+# CarbonData Partition Table Guide
 This tutorial is designed to provide a quick introduction to create and use partition table in Apache CarbonData.
 
 * [Create Partition Table](#create-partition-table)
