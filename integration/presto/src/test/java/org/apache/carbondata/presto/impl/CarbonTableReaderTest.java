@@ -5,6 +5,7 @@ import com.facebook.presto.spi.TableNotFoundException;
 import com.google.gson.Gson;
 import mockit.Mock;
 import mockit.MockUp;
+import org.apache.carbondata.core.cache.dictionary.DictionaryColumnUniqueIdentifier;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
 import org.apache.carbondata.core.datastore.*;
 import org.apache.carbondata.core.datastore.block.*;
@@ -37,6 +38,7 @@ import org.apache.carbondata.core.scan.expression.Expression;
 import org.apache.carbondata.core.scan.expression.LiteralExpression;
 import org.apache.carbondata.core.scan.expression.logical.AndExpression;
 import org.apache.carbondata.core.scan.filter.FilterExpressionProcessor;
+import org.apache.carbondata.core.scan.filter.TableProvider;
 import org.apache.carbondata.core.scan.filter.resolver.ConditionalFilterResolverImpl;
 import org.apache.carbondata.core.scan.filter.resolver.FilterResolverIntf;
 import org.apache.carbondata.core.service.impl.PathFactory;
@@ -46,9 +48,14 @@ import org.apache.carbondata.core.util.CarbonUtil;
 import org.apache.carbondata.core.util.path.CarbonTablePath;
 import org.apache.carbondata.format.TableInfo;
 import org.apache.carbondata.hadoop.CacheAccessClient;
+import org.apache.carbondata.hadoop.CarbonInputSplit;
+import org.apache.carbondata.hadoop.api.CarbonTableInputFormat;
 import org.apache.carbondata.hadoop.util.CarbonInputFormatUtil;
+import org.apache.carbondata.hadoop.util.SchemaReader;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.InputSplit;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.thrift.TBase;
 import org.junit.After;
 import org.junit.Before;
@@ -257,7 +264,7 @@ public class CarbonTableReaderTest {
         new MockUp<PathFactory>() {
             @Mock
             public CarbonTablePath getCarbonTablePath(
-                    String storeLocation, CarbonTableIdentifier tableIdentifier) {
+                    String storeLocation, CarbonTableIdentifier tableIdentifier, DictionaryColumnUniqueIdentifier dictionaryColumnUniqueIdentifier) {
 
                 return new CarbonTablePath("storePath", "schemaName", "tableName");
             }
@@ -312,18 +319,6 @@ public class CarbonTableReaderTest {
         assertEquals(schemaNames.get(0), "schemaName");
     }
 
-    @Test
-    public void getTableNamesTest() {
-        carbonTableReader.setCarbonFileList(new LocalCarbonFile("storePath/schemaName"));
-        assertTrue(carbonTableReader.getTableNames("schemaName").contains("schemaName"));
-    }
-
-    @Test
-    public void getTableNamesTestElseCase() {
-        carbonTableReader.setCarbonFileList(new LocalCarbonFile("storePath/schemaName"));
-        assertTrue(carbonTableReader.getTableNames("schema1").isEmpty());
-    }
-
     @Test(expected = TableNotFoundException.class)
     public void getTableTestExceptionCaseForTableNotFound() {
         new MockUp<FileFactory>() {
@@ -368,7 +363,7 @@ public class CarbonTableReaderTest {
         new MockUp<PathFactory>() {
             @Mock
             public CarbonTablePath getCarbonTablePath(
-                    String storeLocation, CarbonTableIdentifier tableIdentifier) {
+                    String storeLocation, CarbonTableIdentifier tableIdentifier, DictionaryColumnUniqueIdentifier dictionaryColumnUniqueIdentifier) {
 
                 return new CarbonTablePath("storePath", "schemaName", "tableName");
             }
@@ -451,7 +446,7 @@ public class CarbonTableReaderTest {
         new MockUp<CarbonInputFormatUtil>() {
             @Mock
             public FilterResolverIntf resolveFilter(Expression filterExpression,
-                                                    AbsoluteTableIdentifier absoluteTableIdentifier) {
+                                                    AbsoluteTableIdentifier absoluteTableIdentifier, TableProvider tableProvider) {
                 return new ConditionalFilterResolverImpl(inputFilter, true, false, new AbsoluteTableIdentifier("/storePath", new CarbonTableIdentifier("schemaName", "tableName", "tableId")), false);
             }
         };
@@ -466,6 +461,25 @@ public class CarbonTableReaderTest {
         new MockUp<SegmentTaskIndexStore>() {
             @Mock
             public void clearAccessCount(List<TableSegmentUniqueIdentifier> tableSegmentUniqueIdentifiers) {
+            }
+        };
+
+        new MockUp<CarbonTableInputFormat>() {
+            @Mock public List<InputSplit> getSplits(JobContext job) {
+
+                String[] locations = {"storePath"};
+                String[] deleteDeltaFiles = {""};
+                InputSplit inputSplit = new CarbonInputSplit("1", new Path("storePath"), 0, 10, locations, 2, ColumnarFormatVersion.V3, deleteDeltaFiles);
+                List<InputSplit> inputSplits = new ArrayList<>();
+                inputSplits.add(inputSplit);
+                return inputSplits;
+            }
+        };
+
+        new MockUp<CarbonTablePath.DataFileUtil>() {
+            @Mock
+            public String getTaskNo(String carbonDataFileName) {
+                return "taskNo";
             }
         };
 
@@ -515,7 +529,7 @@ public class CarbonTableReaderTest {
         new MockUp<CarbonInputFormatUtil>() {
             @Mock
             public FilterResolverIntf resolveFilter(Expression filterExpression,
-                                                    AbsoluteTableIdentifier absoluteTableIdentifier) {
+                                                    AbsoluteTableIdentifier absoluteTableIdentifier, TableProvider tableProvider) {
                 return new ConditionalFilterResolverImpl(inputFilter, true, false, new AbsoluteTableIdentifier("/storePath", new CarbonTableIdentifier("schemaName", "tableName", "tableId")), false);
             }
         };
@@ -583,6 +597,25 @@ public class CarbonTableReaderTest {
             }
         };
 
+        new MockUp<CarbonTableInputFormat>() {
+            @Mock public List<InputSplit> getSplits(JobContext job) {
+
+                String[] locations = {"storePath"};
+                String[] deleteDeltaFiles = {""};
+                InputSplit inputSplit = new CarbonInputSplit("1", new Path("storePath"), 0, 10, locations, 2, ColumnarFormatVersion.V3, deleteDeltaFiles);
+                List<InputSplit> inputSplits = new ArrayList<>();
+                inputSplits.add(inputSplit);
+                return inputSplits;
+            }
+        };
+
+        new MockUp<CarbonTablePath.DataFileUtil>() {
+            @Mock
+            public String getTaskNo(String carbonDataFileName) {
+                return "taskNo";
+            }
+        };
+
         List<CarbonLocalInputSplit> expectedResult = carbonTableReader.getInputSplits2(carbonTableCacheModel, inputFilter);
         assertEquals(expectedResult.get(0).getSegmentId(), "1");
         assertEquals(expectedResult.get(0).getPath(), "storePath");
@@ -628,7 +661,7 @@ public class CarbonTableReaderTest {
         new MockUp<CarbonInputFormatUtil>() {
             @Mock
             public FilterResolverIntf resolveFilter(Expression filterExpression,
-                                                    AbsoluteTableIdentifier absoluteTableIdentifier) {
+                                                    AbsoluteTableIdentifier absoluteTableIdentifier, TableProvider tableProvider) {
                 return null;
             }
         };
@@ -666,6 +699,25 @@ public class CarbonTableReaderTest {
             @Mock
             public DataRefNode findLastDataBlock(DataRefNode dataRefBlock, IndexKey searchKey) {
                 return this.blockBTreeLeafNode;
+            }
+        };
+
+        new MockUp<CarbonTableInputFormat>() {
+            @Mock public List<InputSplit> getSplits(JobContext job) {
+
+                String[] locations = {"storePath"};
+                String[] deleteDeltaFiles = {""};
+                InputSplit inputSplit = new CarbonInputSplit("1", new Path("storePath"), 0, 10, locations, 2, ColumnarFormatVersion.V3, deleteDeltaFiles);
+                List<InputSplit> inputSplits = new ArrayList<>();
+                inputSplits.add(inputSplit);
+                return inputSplits;
+            }
+        };
+
+        new MockUp<CarbonTablePath.DataFileUtil>() {
+            @Mock
+            public String getTaskNo(String carbonDataFileName) {
+                return "taskNo";
             }
         };
 
