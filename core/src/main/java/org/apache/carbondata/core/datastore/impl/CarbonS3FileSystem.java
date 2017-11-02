@@ -17,10 +17,43 @@
 
 package org.apache.carbondata.core.datastore.impl;
 
+import com.amazonaws.AmazonClientException;
+import com.amazonaws.ClientConfiguration;
+import com.amazonaws.Protocol;
+import com.amazonaws.auth.AWSCredentialsProviderChain;
+import com.amazonaws.auth.InstanceProfileCredentialsProvider;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.model.*;
+import com.amazonaws.services.s3.transfer.TransferManager;
+import com.amazonaws.services.s3.transfer.TransferManagerConfiguration;
+import com.amazonaws.services.s3.transfer.Upload;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Throwables;
+import com.google.common.collect.Iterators;
+import jersey.repackaged.com.google.common.collect.AbstractSequentialIterator;
+import org.apache.carbondata.common.logging.LogService;
+import org.apache.carbondata.common.logging.LogServiceFactory;
+import org.apache.carbondata.core.util.CarbonProperties;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider;
+import org.apache.hadoop.fs.s3a.BasicAWSCredentialsProvider;
+import org.apache.hadoop.util.Progressable;
+import org.joda.time.Duration;
+
+import java.io.*;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+
 import static com.amazonaws.services.s3.Headers.UNENCRYPTED_CONTENT_LENGTH;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.collect.Iterables.toArray;
 import static java.lang.Math.max;
@@ -29,114 +62,13 @@ import static java.lang.String.format;
 import static java.nio.file.Files.createDirectories;
 import static java.nio.file.Files.createTempFile;
 import static java.util.Objects.requireNonNull;
-
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.BLOCK_SIZE;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.DIRECTORY_SUFFIX;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.MAX_SKIP_SIZE;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.PATH_SEPARATOR;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_ACCESS_KEY;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_CREDENTIALS_PROVIDER;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_ENCRYPTION_MATERIALS_PROVIDER;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_ENDPOINT;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_KMS_KEY_ID;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_MAX_CLIENT_RETRIES;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_MAX_ERROR_RETRIES;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_PIN_CLIENT_TO_CURRENT_REGION;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_SECRET_KEY;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_SIGNER_TYPE;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_SSE_ENABLED;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_SSE_KMS_KEY_ID;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_SSE_TYPE;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_SSL_ENABLED;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_STAGING_DIRECTORY;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_USER_AGENT_PREFIX;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_USER_AGENT_SUFFIX;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_USE_INSTANCE_CREDENTIALS;
-
-import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
-import static org.apache.http.HttpStatus.SC_FORBIDDEN;
-import static org.apache.http.HttpStatus.SC_NOT_FOUND;
-import static org.apache.http.HttpStatus.SC_REQUESTED_RANGE_NOT_SATISFIABLE;
-
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.FilterOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InterruptedIOException;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Optional;
-
-import org.apache.carbondata.common.logging.LogService;
-import org.apache.carbondata.common.logging.LogServiceFactory;
-import org.apache.carbondata.core.util.CarbonProperties;
-
-import com.amazonaws.AbortedException;
-import com.amazonaws.AmazonClientException;
-import com.amazonaws.ClientConfiguration;
-import com.amazonaws.Protocol;
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.AWSCredentialsProvider;
-import com.amazonaws.auth.AWSStaticCredentialsProvider;
-import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.auth.InstanceProfileCredentialsProvider;
-import com.amazonaws.event.ProgressEvent;
-import com.amazonaws.event.ProgressEventType;
-import com.amazonaws.event.ProgressListener;
-import com.amazonaws.regions.Region;
-import com.amazonaws.regions.Regions;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.amazonaws.services.s3.AmazonS3EncryptionClientBuilder;
-import com.amazonaws.services.s3.model.AmazonS3Exception;
-import com.amazonaws.services.s3.model.CryptoConfiguration;
-import com.amazonaws.services.s3.model.EncryptionMaterialsProvider;
-import com.amazonaws.services.s3.model.GetObjectRequest;
-import com.amazonaws.services.s3.model.KMSEncryptionMaterialsProvider;
-import com.amazonaws.services.s3.model.ListObjectsRequest;
-import com.amazonaws.services.s3.model.ObjectListing;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.PutObjectRequest;
-import com.amazonaws.services.s3.model.S3Object;
-import com.amazonaws.services.s3.model.S3ObjectInputStream;
-import com.amazonaws.services.s3.model.S3ObjectSummary;
-import com.amazonaws.services.s3.model.SSEAwsKeyManagementParams;
-import com.amazonaws.services.s3.transfer.Transfer;
-import com.amazonaws.services.s3.transfer.TransferManager;
-import com.amazonaws.services.s3.transfer.TransferManagerConfiguration;
-import com.amazonaws.services.s3.transfer.Upload;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Throwables;
-import com.google.common.collect.AbstractSequentialIterator;
-import com.google.common.collect.Iterators;
-import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.BufferedFSInputStream;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FSInputStream;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.util.Progressable;
-import org.joda.time.Duration;
+import static org.apache.carbondata.core.constants.CarbonCommonConstants.*;
+import static org.apache.http.HttpStatus.*;
 
 public class CarbonS3FileSystem extends FileSystem {
-  private static final Duration BACKOFF_MIN_SLEEP = Duration.standardSeconds(1);
+//  private static final Duration BACKOFF_MIN_SLEEP = Duration.standardSeconds(1);
   private static LogService log =
-      LogServiceFactory.getLogService(CarbonS3FileSystem.class.getCanonicalName());
+          LogServiceFactory.getLogService(CarbonS3FileSystem.class.getCanonicalName());
   private final TransferManagerConfiguration transferConfig = new TransferManagerConfiguration();
   private URI uri;
   private Path workingDirectory;
@@ -155,6 +87,12 @@ public class CarbonS3FileSystem extends FileSystem {
     String length = metadata.getUserMetadata().get(UNENCRYPTED_CONTENT_LENGTH);
     return (length != null) ? Long.parseLong(length) : metadata.getContentLength();
   }
+
+  public enum CarbonS3SseType {
+    KMS, S3
+  }
+
+
 
   private static long lastModifiedTime(ObjectMetadata metadata) {
     Date date = metadata.getLastModified();
@@ -177,69 +115,19 @@ public class CarbonS3FileSystem extends FileSystem {
     return key;
   }
 
-  private static Optional<EncryptionMaterialsProvider> createEncryptionMaterialsProvider(
-      Configuration hadoopConfig) {
-    String kmsKeyId = hadoopConfig.get(S3_KMS_KEY_ID);
-    if (kmsKeyId != null) {
-      return Optional.of(new KMSEncryptionMaterialsProvider(kmsKeyId));
-    }
 
-    String empClassName = hadoopConfig.get(S3_ENCRYPTION_MATERIALS_PROVIDER);
-    if (empClassName == null) {
-      return Optional.empty();
-    }
-
+  @Override public void close() throws IOException {
     try {
-      Object instance = Class.forName(empClassName).getConstructor().newInstance();
-      if (!(instance instanceof EncryptionMaterialsProvider)) {
-        throw new RuntimeException(
-            "Invalid encryption materials provider class: " + instance.getClass().getName());
+      super.close();
+    } finally {
+      if (s3 instanceof AmazonS3Client) {
+         ((AmazonS3Client) s3).shutdown();
       }
-      EncryptionMaterialsProvider emp = (EncryptionMaterialsProvider) instance;
-      if (emp instanceof Configurable) {
-        ((Configurable) emp).setConf(hadoopConfig);
-      }
-      return Optional.of(emp);
-    } catch (ReflectiveOperationException e) {
-      throw new RuntimeException(
-          "Unable to load or create S3 encryption materials provider: " + empClassName, e);
     }
   }
 
-  private static AWSCredentialsProvider getCustomAWSCredentialsProvider(URI uri, Configuration conf,
-      String providerClass) {
-    try {
-      //log.debug(String.format("Using AWS credential provider %s for URI %s", providerClass, uri));
-      return conf.getClassByName(providerClass).asSubclass(AWSCredentialsProvider.class)
-          .getConstructor(URI.class, Configuration.class).newInstance(uri, conf);
-    } catch (ReflectiveOperationException e) {
-      throw new RuntimeException(
-          format("Error creating an instance of %s for URI %s", providerClass, uri), e);
-    }
-  }
-
-  private static Optional<AWSCredentials> getAwsCredentials(URI uri, Configuration conf) {
-    String accessKey = conf.get(S3_ACCESS_KEY);
-    String secretKey = conf.get(S3_SECRET_KEY);
-
-    String userInfo = uri.getUserInfo();
-    if (userInfo != null) {
-      int index = userInfo.indexOf(':');
-      if (index < 0) {
-        accessKey = userInfo;
-      } else {
-        accessKey = userInfo.substring(0, index);
-        secretKey = userInfo.substring(index + 1);
-      }
-    }
-
-    if (isNullOrEmpty(accessKey) || isNullOrEmpty(secretKey)) {
-      return Optional.empty();
-    }
-    return Optional.of(new BasicAWSCredentials(accessKey, secretKey));
-  }
-
-  @Override public void initialize(URI uri, Configuration conf) throws IOException {
+  @Override
+  public void initialize(URI uri, Configuration conf) throws IOException {
     requireNonNull(uri, "uri is null");
     requireNonNull(conf, "conf is null");
     super.initialize(uri, conf);
@@ -247,136 +135,64 @@ public class CarbonS3FileSystem extends FileSystem {
 
     this.uri = URI.create(uri.getScheme() + "://" + uri.getAuthority());
     this.workingDirectory =
-        new Path(PATH_SEPARATOR).makeQualified(this.uri, new Path(PATH_SEPARATOR));
+            new Path(PATH_SEPARATOR).makeQualified(this.uri, new Path(PATH_SEPARATOR));
 
     CarbonProperties defaults = CarbonProperties.getInstance();
     conf.set(S3_ACCESS_KEY, defaults.getProperty(S3_ACCESS_KEY));
     conf.set(S3_SECRET_KEY, defaults.getProperty(S3_SECRET_KEY));
     this.stagingDirectory =
-        new File(conf.get(S3_STAGING_DIRECTORY, defaults.getProperty(S3_STAGING_DIRECTORY)));
+            new File(conf.get(S3_STAGING_DIRECTORY, defaults.getProperty(S3_STAGING_DIRECTORY)));
     this.maxAttempts = conf.getInt(S3_MAX_CLIENT_RETRIES,
-        Integer.parseInt(defaults.getProperty(S3_MAX_CLIENT_RETRIES))) + 1;
+            Integer.parseInt(defaults.getProperty(S3_MAX_CLIENT_RETRIES))) + 1;
     this.maxBackoffTime = Duration.millis(1000);
     this.maxRetryTime = Duration.millis(1000);
     int maxErrorRetries = conf.getInt(S3_MAX_ERROR_RETRIES,
-        Integer.parseInt(defaults.getProperty(S3_MAX_ERROR_RETRIES)));
+            Integer.parseInt(defaults.getProperty(S3_MAX_ERROR_RETRIES)));
     boolean sslEnabled =
-        conf.getBoolean(S3_SSL_ENABLED, Boolean.getBoolean(defaults.getProperty(S3_SSL_ENABLED)));
+            conf.getBoolean(S3_SSL_ENABLED, Boolean.getBoolean(defaults.getProperty(S3_SSL_ENABLED)));
     Duration connectTimeout = Duration.standardSeconds(30);
     Duration socketTimeout = Duration.standardSeconds(30);
     int maxConnections = 10;
-    long minFileSize = 320000000;
+    int minFileSize = 320000000;
     long minPartSize = 320000000;
     this.useInstanceCredentials = conf.getBoolean(S3_USE_INSTANCE_CREDENTIALS,
-        Boolean.getBoolean(defaults.getProperty(S3_USE_INSTANCE_CREDENTIALS)));
+            Boolean.getBoolean(defaults.getProperty(S3_USE_INSTANCE_CREDENTIALS)));
     this.pinS3ClientToCurrentRegion = conf.getBoolean(S3_PIN_CLIENT_TO_CURRENT_REGION,
-        Boolean.getBoolean(defaults.getProperty(S3_PIN_CLIENT_TO_CURRENT_REGION)));
+            Boolean.getBoolean(defaults.getProperty(S3_PIN_CLIENT_TO_CURRENT_REGION)));
     this.sseEnabled =
-        conf.getBoolean(S3_SSE_ENABLED, Boolean.getBoolean(defaults.getProperty(S3_SSE_ENABLED)));
+            conf.getBoolean(S3_SSE_ENABLED, Boolean.getBoolean(defaults.getProperty(S3_SSE_ENABLED)));
     this.sseType = CarbonS3SseType.valueOf(conf.get(S3_SSE_TYPE, CarbonS3SseType.S3.name()));
     this.sseKmsKeyId = conf.get(S3_SSE_KMS_KEY_ID, defaults.getProperty(S3_SSE_KMS_KEY_ID));
-    String userAgentPrefix =
-        conf.get(S3_USER_AGENT_PREFIX, defaults.getProperty(S3_USER_AGENT_PREFIX));
 
     ClientConfiguration configuration = new ClientConfiguration().withMaxErrorRetry(maxErrorRetries)
-        .withProtocol(sslEnabled ? Protocol.HTTPS : Protocol.HTTP)
-        .withConnectionTimeout(toIntExact(connectTimeout.getMillis()))
-        .withSocketTimeout(toIntExact(socketTimeout.getMillis())).withMaxConnections(maxConnections)
-        .withUserAgentPrefix(userAgentPrefix).withUserAgentSuffix(S3_USER_AGENT_SUFFIX);
+            .withProtocol(sslEnabled ? Protocol.HTTPS : Protocol.HTTP)
+            .withConnectionTimeout(toIntExact(connectTimeout.getMillis()))
+            .withSocketTimeout(toIntExact(socketTimeout.getMillis())).withMaxConnections(maxConnections);
 
-    this.s3 = createAmazonS3Client(uri, conf, configuration);
+    AWSCredentialsProviderChain credentials = new AWSCredentialsProviderChain(
+            new BasicAWSCredentialsProvider(conf.get(S3_ACCESS_KEY), conf.get(S3_SECRET_KEY)),
+            new InstanceProfileCredentialsProvider(),
+            new AnonymousAWSCredentialsProvider()
+    );
 
+    this.s3 = new AmazonS3Client(credentials, configuration);
     transferConfig.setMultipartUploadThreshold(minFileSize);
     transferConfig.setMinimumUploadPartSize(minPartSize);
   }
 
-  @Override public void close() throws IOException {
-    try {
-      super.close();
-    } finally {
-      if (s3 instanceof AmazonS3Client) {
-        ((AmazonS3Client) s3).shutdown();
-      }
-    }
-  }
-
-  @Override public URI getUri() {
+  @Override
+  public URI getUri() {
     return uri;
   }
 
-  @Override public Path getWorkingDirectory() {
-    return workingDirectory;
-  }
-
-  @Override public void setWorkingDirectory(Path path) {
-    workingDirectory = path;
-  }
-
-  @Override public FileStatus[] listStatus(Path path) throws IOException {
-    // STATS.newListStatusCall();
-    List<LocatedFileStatus> list = new ArrayList<>();
-    RemoteIterator<LocatedFileStatus> iterator = listLocatedStatus(path);
-    while (iterator.hasNext()) {
-      list.add(iterator.next());
-    }
-    return toArray(list, LocatedFileStatus.class);
-  }
-
-  @Override public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path path) {
-    //STATS.newListLocatedStatusCall();
-    return new RemoteIterator<LocatedFileStatus>() {
-      private final Iterator<LocatedFileStatus> iterator = listPrefix(path);
-
-      @Override public boolean hasNext() throws IOException {
-        try {
-          return iterator.hasNext();
-        } catch (AmazonClientException e) {
-          throw new IOException(e);
-        }
-      }
-
-      @Override public LocatedFileStatus next() throws IOException {
-        try {
-          return iterator.next();
-        } catch (AmazonClientException e) {
-          throw new IOException(e);
-        }
-      }
-    };
-  }
-
-  @Override public FileStatus getFileStatus(Path path) throws IOException {
-    if (path.getName().isEmpty()) {
-      // the bucket root requires special handling
-      if (getS3ObjectMetadata(path) != null) {
-        return new FileStatus(0, true, 1, 0, 0, qualifiedPath(path));
-      }
-      throw new FileNotFoundException("File does not exist: " + path);
-    }
-
-    ObjectMetadata metadata = getS3ObjectMetadata(path);
-
-    if (metadata == null) {
-      // check if this path is a directory
-      Iterator<LocatedFileStatus> iterator = listPrefix(path);
-      if (iterator.hasNext()) {
-        return new FileStatus(0, true, 1, 0, 0, qualifiedPath(path));
-      }
-      throw new FileNotFoundException("File does not exist: " + path);
-    }
-
-    return new FileStatus(getObjectSize(metadata), false, 1, BLOCK_SIZE, lastModifiedTime(metadata),
-        qualifiedPath(path));
-  }
-
-  @Override public FSDataInputStream open(Path path, int bufferSize) throws IOException {
+  @Override
+  public FSDataInputStream open(Path path, int bufferSize) throws IOException {
     return new FSDataInputStream(new BufferedFSInputStream(
-        new CarbonS3InputStream(s3, uri.getHost(), path, maxAttempts, maxBackoffTime, maxRetryTime),
-        bufferSize));
-  }
+            new CarbonS3InputStream(s3, uri.getHost(), path, maxAttempts, maxBackoffTime, maxRetryTime),
+            bufferSize));    }
 
-  @Override public FSDataOutputStream create(Path path, FsPermission permission, boolean overwrite,
-      int bufferSize, short replication, long blockSize, Progressable progress) throws IOException {
+  @Override
+  public FSDataOutputStream create(Path path, FsPermission fsPermission, boolean overwrite, int bufferSize, short replication, long blockSize, Progressable progressable) throws IOException {
     if ((!overwrite) && exists(path)) {
       throw new IOException("File already exists:" + path);
     }
@@ -391,9 +207,8 @@ public class CarbonS3FileSystem extends FileSystem {
 
     String key = keyFromPath(qualifiedPath(path));
     return new FSDataOutputStream(
-        new CarbonS3OutputStream(s3, transferConfig, uri.getHost(), key, tempFile, sseEnabled,
-            sseType, sseKmsKeyId), statistics);
-  }
+            new CarbonS3OutputStream(s3, transferConfig, uri.getHost(), key, tempFile, sseEnabled,
+                    sseType), statistics);    }
 
   @Override public FSDataOutputStream append(Path f, int bufferSize, Progressable progress) {
     try {
@@ -425,11 +240,11 @@ public class CarbonS3FileSystem extends FileSystem {
         outputStream.close();
         return new FSDataOutputStream(
             new CarbonS3OutputStream(s3, transferConfig, uri.getHost(), key, tempFile, sseEnabled,
-                sseType, sseKmsKeyId), statistics);
+                sseType), statistics);
       } else {
         return new FSDataOutputStream(
             new CarbonS3OutputStream(s3, transferConfig, uri.getHost(), key, tempFile, sseEnabled,
-                sseType, sseKmsKeyId), statistics);
+                sseType), statistics);
       }
     } catch (IOException e) {
       throw new RuntimeException(e.getMessage(), e);
@@ -474,7 +289,20 @@ public class CarbonS3FileSystem extends FileSystem {
     return true;
   }
 
-  @Override public boolean delete(Path path, boolean recursive) throws IOException {
+  private boolean directory(Path path) throws IOException {
+    return getFileStatus(path).isDirectory();
+  }
+
+  private boolean deleteObject(String key) {
+    try {
+      s3.deleteObject(uri.getHost(), key);
+      return true;
+    } catch (AmazonClientException e) {
+      return false;
+    }
+  }
+
+  @Override  public boolean delete(Path path, boolean recursive) throws IOException {
     try {
       if (!directory(path)) {
         return deleteObject(keyFromPath(path));
@@ -495,22 +323,80 @@ public class CarbonS3FileSystem extends FileSystem {
     return true;
   }
 
-  private boolean directory(Path path) throws IOException {
-    return getFileStatus(path).isDirectory();
-  }
-
-  private boolean deleteObject(String key) {
-    try {
-      s3.deleteObject(uri.getHost(), key);
-      return true;
-    } catch (AmazonClientException e) {
-      return false;
+  @Override
+  public FileStatus[] listStatus(Path path) throws FileNotFoundException, IOException {
+// STATS.newListStatusCall();
+    List<LocatedFileStatus> list = new ArrayList<>();
+    RemoteIterator<LocatedFileStatus> iterator = listLocatedStatus(path);
+    while (iterator.hasNext()) {
+      list.add(iterator.next());
     }
+    return toArray(list, LocatedFileStatus.class);
   }
 
-  @Override public boolean mkdirs(Path f, FsPermission permission) {
+  @Override public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path path) {
+    //STATS.newListLocatedStatusCall();
+    return new RemoteIterator<LocatedFileStatus>() {
+      private final Iterator<LocatedFileStatus> iterator = listPrefix(path);
+
+      @Override public boolean hasNext() throws IOException {
+        try {
+          return iterator.hasNext();
+        } catch (AmazonClientException e) {
+          throw new IOException(e);
+        }
+      }
+
+      @Override public LocatedFileStatus next() throws IOException {
+        try {
+          return iterator.next();
+        } catch (AmazonClientException e) {
+          throw new IOException(e);
+        }
+      }
+    };
+  }
+
+
+  @Override
+  public void setWorkingDirectory(Path path) {
+    workingDirectory = path;
+  }
+
+  @Override
+  public Path getWorkingDirectory() {
+    return workingDirectory;
+  }
+
+  @Override
+  public boolean mkdirs(Path path, FsPermission fsPermission) throws IOException {
     // no need to do anything for S3
     return true;
+  }
+
+  @Override
+  public FileStatus getFileStatus(Path path) throws IOException {
+    if (path.getName().isEmpty()) {
+      // the bucket root requires special handling
+      if (getS3ObjectMetadata(path) != null) {
+        return new FileStatus(0, true, 1, 0, 0, qualifiedPath(path));
+      }
+      throw new FileNotFoundException("File does not exist: " + path);
+    }
+
+    ObjectMetadata metadata = getS3ObjectMetadata(path);
+
+    if (metadata == null) {
+      // check if this path is a directory
+      Iterator<LocatedFileStatus> iterator = listPrefix(path);
+      if (iterator.hasNext()) {
+        return new FileStatus(0, true, 1, 0, 0, qualifiedPath(path));
+      }
+      throw new FileNotFoundException("File does not exist: " + path);
+    }
+
+    return new FileStatus(getObjectSize(metadata), false, 1, BLOCK_SIZE, lastModifiedTime(metadata),
+            qualifiedPath(path));
   }
 
   private Iterator<LocatedFileStatus> listPrefix(Path path) {
@@ -520,25 +406,26 @@ public class CarbonS3FileSystem extends FileSystem {
     }
 
     ListObjectsRequest request =
-        new ListObjectsRequest().withBucketName(uri.getHost()).withPrefix(key)
-            .withDelimiter(PATH_SEPARATOR);
+            new ListObjectsRequest().withBucketName(uri.getHost()).withPrefix(key)
+                    .withDelimiter(PATH_SEPARATOR);
 
     Iterator<ObjectListing> listings =
-        new AbstractSequentialIterator<ObjectListing>(s3.listObjects(request)) {
-          @Override protected ObjectListing computeNext(ObjectListing previous) {
-            if (!previous.isTruncated()) {
-              return null;
-            }
-            return s3.listNextBatchOfObjects(previous);
-          }
-        };
+            new AbstractSequentialIterator<ObjectListing>(s3.listObjects(request)) {
+              @Override
+              protected ObjectListing computeNext(ObjectListing previous) {
+                if (!previous.isTruncated()) {
+                  return null;
+                }
+                return s3.listNextBatchOfObjects(previous);
+              }
+            };
 
     return Iterators.concat(Iterators.transform(listings, this::statusFromListing));
   }
 
   private Iterator<LocatedFileStatus> statusFromListing(ObjectListing listing) {
     return Iterators.concat(statusFromPrefixes(listing.getCommonPrefixes()),
-        statusFromObjects(listing.getObjectSummaries()));
+            statusFromObjects(listing.getObjectSummaries()));
   }
 
   private Iterator<LocatedFileStatus> statusFromPrefixes(List<String> prefixes) {
@@ -556,31 +443,10 @@ public class CarbonS3FileSystem extends FileSystem {
     // however, to get the correct size we'd need to make an additional request to get
     // user metadata, and in this case it doesn't matter.
     return objects.stream().filter(object -> !object.getKey().endsWith(PATH_SEPARATOR)).map(
-        object -> new FileStatus(object.getSize(), false, 1, BLOCK_SIZE,
-            object.getLastModified().getTime(),
-            qualifiedPath(new Path(PATH_SEPARATOR + object.getKey()))))
-        .map(this::createLocatedFileStatus).iterator();
-  }
-
-  @VisibleForTesting ObjectMetadata getS3ObjectMetadata(Path path) throws IOException {
-
-    try {
-      //  STATS.newMetadataCall();
-      return s3.getObjectMetadata(uri.getHost(), keyFromPath(path));
-    } catch (RuntimeException e) {
-      // STATS.newGetMetadataError();
-      if (e instanceof AmazonS3Exception) {
-        switch (((AmazonS3Exception) e).getStatusCode()) {
-          case SC_NOT_FOUND:
-            return null;
-          case SC_FORBIDDEN:
-          case SC_BAD_REQUEST:
-            throw new UnrecoverableS3OperationException(path, e);
-        }
-      }
-      throw Throwables.propagate(e);
-    }
-
+            object -> new FileStatus(object.getSize(), false, 1, BLOCK_SIZE,
+                    object.getLastModified().getTime(),
+                    qualifiedPath(new Path(PATH_SEPARATOR + object.getKey()))))
+            .map(this::createLocatedFileStatus).iterator();
   }
 
   private Path qualifiedPath(Path path) {
@@ -596,56 +462,25 @@ public class CarbonS3FileSystem extends FileSystem {
     }
   }
 
-  private AmazonS3 createAmazonS3Client(URI uri, Configuration hadoopConfig,
-      ClientConfiguration clientConfig) {
-    AWSCredentialsProvider credentials = getAwsCredentialsProvider(uri, hadoopConfig);
-    Optional<EncryptionMaterialsProvider> emp = createEncryptionMaterialsProvider(hadoopConfig);
-    AmazonS3 client;
-    String signerType = hadoopConfig.get(S3_SIGNER_TYPE);
-    if (signerType != null) {
-      clientConfig.withSignerOverride(signerType);
-    }
-    if (emp.isPresent()) {
-      client = AmazonS3EncryptionClientBuilder.standard().withClientConfiguration(clientConfig)
-          .withCredentials(credentials).withCryptoConfiguration(new CryptoConfiguration())
-          .withEncryptionMaterials(emp.get()).build();
-    } else {
-      client = AmazonS3ClientBuilder.standard().withRegion("us-west-2")
-          .withForceGlobalBucketAccessEnabled(true).withCredentials(credentials).build();
-    }
-
-    // use local region when running inside of EC2
-    if (pinS3ClientToCurrentRegion) {
-      Region region = Regions.getCurrentRegion();
-      if (region != null) {
-        client.setRegion(region);
+  @VisibleForTesting
+  ObjectMetadata getS3ObjectMetadata(Path path) throws IOException {
+    try {
+      //  STATS.newMetadataCall();
+      return s3.getObjectMetadata(uri.getHost(), keyFromPath(path));
+    } catch (RuntimeException e) {
+      // STATS.newGetMetadataError();
+      if (e instanceof AmazonS3Exception) {
+        switch (((AmazonS3Exception) e).getStatusCode()) {
+          case SC_NOT_FOUND:
+            return null;
+          case SC_FORBIDDEN:
+          case SC_BAD_REQUEST:
+            throw new AmazonS3Exception(" Unrecoverable S3 Operation Exception", e);
+        }
       }
+      throw Throwables.propagate(e);
     }
 
-    String endpoint = hadoopConfig.get(S3_ENDPOINT);
-    if (endpoint != null) {
-      client.setEndpoint(endpoint);
-    }
-
-    return client;
-  }
-
-  private AWSCredentialsProvider getAwsCredentialsProvider(URI uri, Configuration conf) {
-    Optional<AWSCredentials> credentials = getAwsCredentials(uri, conf);
-    if (credentials.isPresent()) {
-      return new AWSStaticCredentialsProvider(credentials.get());
-    }
-
-    if (useInstanceCredentials) {
-      return new InstanceProfileCredentialsProvider();
-    }
-
-    String providerClass = conf.get(S3_CREDENTIALS_PROVIDER);
-    if (!isNullOrEmpty(providerClass)) {
-      return getCustomAWSCredentialsProvider(uri, conf, providerClass);
-    }
-
-    throw new RuntimeException("S3 credentials not configured");
   }
 
   @VisibleForTesting AmazonS3 getS3Client() {
@@ -654,10 +489,6 @@ public class CarbonS3FileSystem extends FileSystem {
 
   @VisibleForTesting void setS3Client(AmazonS3 client) {
     s3 = client;
-  }
-
-  public enum CarbonS3SseType {
-    KMS, S3
   }
 
   /**
@@ -686,7 +517,7 @@ public class CarbonS3FileSystem extends FileSystem {
     private long nextReadPosition;
 
     public CarbonS3InputStream(AmazonS3 s3, String host, Path path, int maxAttempts,
-        Duration maxBackoffTime, Duration maxRetryTime) {
+                               Duration maxBackoffTime, Duration maxRetryTime) {
       this.s3 = requireNonNull(s3, "s3 is null");
       this.host = requireNonNull(host, "host is null");
       this.path = requireNonNull(path, "path is null");
@@ -697,12 +528,15 @@ public class CarbonS3FileSystem extends FileSystem {
       this.maxRetryTime = requireNonNull(maxRetryTime, "maxRetryTime is null");
     }
 
-    @Override public void close() {
+    @Override
+    public void close() {
       closed = true;
       closeStream();
     }
 
-    @Override public void seek(long pos) {
+
+    @Override
+    public void seek(long pos) throws IOException {
       checkState(!closed, "already closed");
       checkArgument(pos >= 0, "position is negative: %s", pos);
 
@@ -710,16 +544,24 @@ public class CarbonS3FileSystem extends FileSystem {
       nextReadPosition = pos;
     }
 
-    @Override public long getPos() {
+    @Override
+    public long getPos() throws IOException {
       return nextReadPosition;
     }
 
-    @Override public int read() {
-      // This stream is wrapped with BufferedInputStream, so this method should never be called
+    @Override
+    public boolean seekToNewSource(long l) throws IOException {
+      return false;
+    }
+
+    @Override
+    public int read() throws IOException {
+// This stream is wrapped with BufferedInputStream, so this method should never be called
       throw new UnsupportedOperationException();
     }
 
-    @Override public int read(byte[] buffer, int offset, int length) throws IOException {
+    @Override
+    public int read(byte[] buffer, int offset, int length) throws IOException {
       int bytesRead;
       try {
         seekStream();
@@ -735,10 +577,6 @@ public class CarbonS3FileSystem extends FileSystem {
       }
       return bytesRead;
 
-    }
-
-    @Override public boolean seekToNewSource(long targetPos) {
-      return false;
     }
 
     private void seekStream() throws IOException {
@@ -782,7 +620,7 @@ public class CarbonS3FileSystem extends FileSystem {
         // boolean objectExists = s3.doesObjectExist(host, keyFromPath(path));
         // if(objectExists) {
         GetObjectRequest request =
-            new GetObjectRequest(host, keyFromPath(path)).withRange(start, Long.MAX_VALUE);
+                new GetObjectRequest(host, keyFromPath(path)).withRange(start, Long.MAX_VALUE);
         return s3.getObject(request).getObjectContent();
       /*  } else {
           ObjectListing objectListing = s3.listObjects(path.toUri().getPath());
@@ -815,7 +653,7 @@ public class CarbonS3FileSystem extends FileSystem {
           } else {
             in.close();
           }
-        } catch (IOException | AbortedException ignored) {
+        } catch (IOException e) {
           // thrown if the current thread is in the interrupted state
         }
         in = null;
@@ -823,119 +661,78 @@ public class CarbonS3FileSystem extends FileSystem {
     }
   }
 
-  public static class CarbonS3OutputStream extends FilterOutputStream {
-    private final TransferManager transferManager;
-    private final String host;
-    private final String key;
-    private final File tempFile;
-    private final boolean sseEnabled;
-    private final CarbonS3SseType sseType;
-    private final String sseKmsKeyId;
+    public static class CarbonS3OutputStream extends FilterOutputStream {
 
-    private boolean closed;
+      private final TransferManager transferManager;
+      private final String host;
+      private final String key;
+      private final File tempFile;
+      private final boolean sseEnabled;
+      private final CarbonS3SseType sseType;
 
-    public CarbonS3OutputStream(AmazonS3 s3, TransferManagerConfiguration config, String host,
-        String key, File tempFile, boolean sseEnabled, CarbonS3SseType sseType, String sseKmsKeyId)
-        throws IOException {
-      super(new BufferedOutputStream(
-          new FileOutputStream(requireNonNull(tempFile, "tempFile is null"))));
+      private boolean closed;
 
-      transferManager = new TransferManager(requireNonNull(s3, "s3 is null"));
-      transferManager.setConfiguration(requireNonNull(config, "config is null"));
+      public CarbonS3OutputStream(AmazonS3 s3, TransferManagerConfiguration config, String host,
+                                  String key, File tempFile, boolean sseEnabled, CarbonS3SseType sseType)
+              throws IOException {
+        super(new BufferedOutputStream(
+                new FileOutputStream(requireNonNull(tempFile, "tempFile is null"))));
 
-      this.host = requireNonNull(host, "host is null");
-      this.key = requireNonNull(key, "key is null");
-      this.tempFile = tempFile;
-      this.sseEnabled = sseEnabled;
-      this.sseType = requireNonNull(sseType, "sseType is null");
-      this.sseKmsKeyId = sseKmsKeyId;
+        transferManager = new TransferManager(requireNonNull(s3, "s3 is null"));
+        transferManager.setConfiguration(requireNonNull(config, "config is null"));
 
-      log.debug("OutputStream for key = " + key + " using file: " + tempFile);
-    }
+        this.host = requireNonNull(host, "host is null");
+        this.key = requireNonNull(key, "key is null");
+        this.tempFile = tempFile;
+        this.sseEnabled = sseEnabled;
+        this.sseType = requireNonNull(sseType, "sseType is null");
 
-    @Override public void close() throws IOException {
-      if (closed) {
-        return;
+        log.debug("OutputStream for key = " + key + " using file: " + tempFile);
       }
-      closed = true;
 
-      try {
-        super.close();
-        uploadObject();
-      } finally {
-        if (!tempFile.delete()) {
-          log.warn(String.format("Could not delete temporary file: %s", tempFile));
+      @Override
+      public void close() throws IOException {
+        if (closed) {
+          return;
         }
-        // close transfer manager but keep underlying S3 client open
-        transferManager.shutdownNow(false);
-      }
-    }
+        closed = true;
 
-    private void uploadObject() throws IOException {
-      try {
-        log.debug(String
-            .format("Starting upload for host: %s, key: %s, file: %s, size: %s", host, key,
-                tempFile, tempFile.length()));
-        // STATS.uploadStarted();
-
-        PutObjectRequest request = new PutObjectRequest(host, key, tempFile);
-        if (sseEnabled) {
-          switch (sseType) {
-            case KMS:
-              if (sseKmsKeyId != null) {
-                request.withSSEAwsKeyManagementParams(new SSEAwsKeyManagementParams(sseKmsKeyId));
-              } else {
-                request.withSSEAwsKeyManagementParams(new SSEAwsKeyManagementParams());
-              }
-              break;
-            case S3:
-              ObjectMetadata metadata = new ObjectMetadata();
-              metadata.setSSEAlgorithm(ObjectMetadata.AES_256_SERVER_SIDE_ENCRYPTION);
-              request.setMetadata(metadata);
-              break;
+        try {
+          super.close();
+          uploadObject();
+        } finally {
+          if (!tempFile.delete()) {
+            log.warn(String.format("Could not delete temporary file: %s", tempFile));
           }
+          // close transfer manager but keep underlying S3 client open
+          transferManager.shutdownNow(false);
         }
+      }
 
-        Upload upload = transferManager.upload(request);
+      private void uploadObject() throws IOException {
+        try {
+          log.debug(String
+                  .format("Starting upload for host: %s, key: %s, file: %s, size: %s", host, key,
+                          tempFile, tempFile.length()));
+          // STATS.uploadStarted();
 
-        if (log.isDebugEnabled()) {
-          upload.addProgressListener(createProgressListener(upload));
+          PutObjectRequest request = new PutObjectRequest(host, key, tempFile);
+
+          Upload upload = transferManager.upload(request);
+
+          upload.waitForCompletion();
+          // STATS.uploadSuccessful();
+          log.debug(String.format("Completed upload for host: %s, key: %s", host, key));
+        } catch (AmazonClientException e) {
+          // STATS.uploadFailed();
+          throw new IOException(e);
+        } catch (InterruptedException e) {
+          // STATS.uploadFailed();
+          Thread.currentThread().interrupt();
+          throw new InterruptedIOException();
         }
-
-        upload.waitForCompletion();
-        // STATS.uploadSuccessful();
-        log.debug(String.format("Completed upload for host: %s, key: %s", host, key));
-      } catch (AmazonClientException e) {
-        // STATS.uploadFailed();
-        throw new IOException(e);
-      } catch (InterruptedException e) {
-        // STATS.uploadFailed();
-        Thread.currentThread().interrupt();
-        throw new InterruptedIOException();
       }
     }
 
-    private ProgressListener createProgressListener(Transfer transfer) {
-      return new ProgressListener() {
-        private ProgressEventType previousType;
-        private double previousTransferred;
 
-        @Override public synchronized void progressChanged(ProgressEvent progressEvent) {
-          ProgressEventType eventType = progressEvent.getEventType();
-          if (previousType != eventType) {
-            log.debug(String.format("Upload progress event (%s/%s): %s", host, key, eventType));
-            previousType = eventType;
-          }
-
-          double transferred = transfer.getProgress().getPercentTransferred();
-          if (transferred >= (previousTransferred + 10.0)) {
-            log.debug(String.format("Upload percentage (%s/%s): %.0f%%", host, key, transferred));
-            previousTransferred = transferred;
-          }
-        }
-      };
-    }
   }
-}
-
-
