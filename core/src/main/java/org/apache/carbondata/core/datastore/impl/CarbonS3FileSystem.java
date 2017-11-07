@@ -46,7 +46,7 @@ public class CarbonS3FileSystem extends S3AFileSystem {
 
     @Override
     public void initialize(URI uri, Configuration conf) throws IOException {
-        System.out.println("\n------------init----------------\n");
+      //  System.out.println("\n------------init----------------\n");
         requireNonNull(uri, "uri is null");
         requireNonNull(conf, "conf is null");
 
@@ -65,6 +65,8 @@ public class CarbonS3FileSystem extends S3AFileSystem {
                 Integer.parseInt(defaults.getProperty(S3_MAX_ERROR_RETRIES)));
         conf.set(MULTIPART_SIZE,"320000000");
         conf.set(MIN_MULTIPART_THRESHOLD,"320000000");
+        conf.set(FAST_UPLOAD,"true");
+        conf.set(PURGE_EXISTING_MULTIPART,"true");
         super.initialize(uri, conf);
     }
 
@@ -75,7 +77,8 @@ public class CarbonS3FileSystem extends S3AFileSystem {
 
     @Override
     public FSDataOutputStream append(Path f, int bufferSize, Progressable progress) throws IOException {
-        System.out.println("\n------------append----------------\n");
+      //  System.out.println("\n------------append----------------\n"+f+" size "+bufferSize);
+      //  long prevTime=System.currentTimeMillis();
 
         if (!stagingDirectory.exists()) {
             createDirectories(stagingDirectory.toPath());
@@ -98,9 +101,13 @@ public class CarbonS3FileSystem extends S3AFileSystem {
                 outputStream.write(content, 0, bytesRead);
                 totalSize += bytesRead;
             }
-            System.out.println("Total Size of file in bytes = " + totalSize);
+          //  System.out.println("Total Size of file in bytes = " + totalSize);
             outputStream.close();
-            return create(f, true, totalSize, Short.valueOf("0"), totalSize, null);
+
+           // long cprevTime=System.currentTimeMillis();
+            FSDataOutputStream fStream=create(f, true, totalSize, Short.valueOf("0"), totalSize, null);
+
+              return fStream;
         } else
             throw new IOException("file not found");
     }

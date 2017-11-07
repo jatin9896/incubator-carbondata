@@ -112,7 +112,8 @@ public class S3FileLock extends AbstractCarbonLock {
    */
   @Override
   public boolean unlock() {
-    boolean status = false;
+   // long startTime=System.currentTimeMillis();
+     boolean status = false;
     if (null != dataOutputStream) {
       try {
         dataOutputStream.close();
@@ -136,6 +137,9 @@ public class S3FileLock extends AbstractCarbonLock {
         }
       }
     }
+  //  long lastTime=System.currentTimeMillis();
+  //  System.out.print("\n-------------lock Total time+"+ (lastTime-startTime)+"\n");
+
     return status;
   }
 
