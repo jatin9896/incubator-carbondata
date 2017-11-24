@@ -32,8 +32,8 @@ object S3Example {
       .addProperty("carbon.blockletgroup.size.in.mb", "32")
       .addProperty(CarbonCommonConstants.CARBON_TIMESTAMP_FORMAT, "yyyy/MM/dd HH:mm:ss")
       .addProperty(CarbonCommonConstants.CARBON_DATE_FORMAT, "yyyy/MM/dd")
-      .addProperty(CarbonCommonConstants.S3_ACCESS_KEY, "******")
-      .addProperty(CarbonCommonConstants.S3_SECRET_KEY, "******")
+      .addProperty(CarbonCommonConstants.S3_ACCESS_KEY, "***********")
+      .addProperty(CarbonCommonConstants.S3_SECRET_KEY, "***********")
       .addProperty(CarbonCommonConstants.S3_IMPLEMENTATION, "org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem")
 
 

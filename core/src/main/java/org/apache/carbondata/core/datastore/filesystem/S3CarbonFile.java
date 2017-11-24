@@ -34,8 +34,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
-public class S3CarbonFile implements CarbonFile
-{
+public class S3CarbonFile implements CarbonFile {
 
   private static final LogService LOGGER =
       LogServiceFactory.getLogService(S3CarbonFile.class.getName());
@@ -43,7 +42,6 @@ public class S3CarbonFile implements CarbonFile
   protected FileStatus fileStatus;
 
   private FileSystem fs;
-
 
   public S3CarbonFile(String filePath) {
     filePath = filePath.replace("\\", "/");

@@ -41,7 +41,6 @@ public class S3FileHolderImpl implements FileHolder {
         new HashMap<String, FSDataInputStream>(CarbonCommonConstants.DEFAULT_COLLECTION_SIZE);
   }
 
-
   @Override public ByteBuffer readByteBuffer(String filePath, long offset, int length)
       throws IOException {
     byte[] readByteArray = readByteArray(filePath, offset, length);
@@ -49,7 +48,6 @@ public class S3FileHolderImpl implements FileHolder {
     byteBuffer.rewind();
     return byteBuffer;
   }
-
 
   /**
    * This method will be used to check whether stream is already present in
@@ -99,7 +97,6 @@ public class S3FileHolderImpl implements FileHolder {
     return byteBffer;
   }
 
-
   @Override public byte[] readByteArray(String filePath, long offset, int length)
       throws IOException {
     FSDataInputStream fileChannel = updateCache(filePath);
@@ -144,12 +141,12 @@ public class S3FileHolderImpl implements FileHolder {
 
   }
 
-  @Override public void setQueryId(String queryId) {
-    this.queryId = queryId;
-  }
-
   @Override public String getQueryId() {
     return queryId;
+  }
+
+  @Override public void setQueryId(String queryId) {
+    this.queryId = queryId;
   }
 
   @Override public DataInputStream getDataInputStream(String filePath, long offset)

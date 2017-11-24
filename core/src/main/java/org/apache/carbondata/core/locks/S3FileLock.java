@@ -17,6 +17,9 @@
 
 package org.apache.carbondata.core.locks;
 
+import java.io.DataOutputStream;
+import java.io.IOException;
+
 import org.apache.carbondata.common.logging.LogService;
 import org.apache.carbondata.common.logging.LogServiceFactory;
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
@@ -24,108 +27,93 @@ import org.apache.carbondata.core.datastore.filesystem.CarbonFile;
 import org.apache.carbondata.core.datastore.impl.FileFactory;
 import org.apache.carbondata.core.metadata.AbsoluteTableIdentifier;
 
-import java.io.DataOutputStream;
-import java.io.IOException;
-
-
 /**
- * This class is used to handle the HDFS File locking.
+ * This class is used to handle the S3 File locking.
  * This is acheived using the concept of acquiring the data out stream using Append option.
  */
 public class S3FileLock extends AbstractCarbonLock {
 
-    private static final LogService LOGGER =
-            LogServiceFactory.getLogService(S3FileLock.class.getName());
-    /**
-     * location hdfs file location
-     */
-    private String location;
+  private static final LogService LOGGER =
+      LogServiceFactory.getLogService(S3FileLock.class.getName());
+  /**
+   * location hdfs file location
+   */
+  private String location;
 
-    private DataOutputStream dataOutputStream;
+  private DataOutputStream dataOutputStream;
 
-    private static String tmpPath;
+  /**
+   * @param lockFilePath
+   */
+  public S3FileLock(String lockFilePath) {
+    this.location = lockFilePath;
+    initRetry();
+  }
 
-    /**
-     * @param lockFileLocation
-     * @param lockFile
-     */
-    public S3FileLock(String lockFileLocation, String lockFile) {
-        this.location = lockFileLocation
-                + CarbonCommonConstants.FILE_SEPARATOR + lockFile;
-        LOGGER.info("S3 lock path:" + this.location);
-        initRetry();
-    }
+  /**
+   * @param tableIdentifier
+   * @param lockFile
+   */
+  public S3FileLock(AbsoluteTableIdentifier tableIdentifier, String lockFile) {
+    this(tableIdentifier.getTablePath(), lockFile);
+  }
 
-    /**
-     * @param lockFilePath
-     */
-    public S3FileLock(String lockFilePath) {
-        this.location = lockFilePath;
-        initRetry();
-    }
+  /**
+   * @param lockFileLocation
+   * @param lockFile
+   */
+  public S3FileLock(String lockFileLocation, String lockFile) {
+    this.location = lockFileLocation + CarbonCommonConstants.FILE_SEPARATOR + lockFile;
+    LOGGER.info("S3 lock path:" + this.location);
+    initRetry();
+  }
 
-    /**
-     * @param tableIdentifier
-     * @param lockFile
-     */
-    public S3FileLock(AbsoluteTableIdentifier tableIdentifier, String lockFile) {
-        this(tableIdentifier.getTablePath(), lockFile);
-    }
-
-    /* (non-Javadoc)
-     * @see org.apache.carbondata.core.locks.ICarbonLock#lock()
-     */
-    @Override
-    public boolean lock() {
-        try {
-            if (!FileFactory.isFileExist(location, FileFactory.getFileType(location))) {
-                FileFactory.createNewLockFile(location, FileFactory.getFileType(location));
-            }
-            dataOutputStream =
-                    FileFactory.getDataOutputStreamUsingAppend(location, FileFactory.getFileType(location));
-
-            return true;
-
-        } catch (IOException e) {
-            LOGGER.error(e, e.getMessage());
-            return false;
+  /* (non-Javadoc)
+   * @see org.apache.carbondata.core.locks.ICarbonLock#unlock()
+   */
+  @Override public boolean unlock() {
+    boolean status = false;
+    if (null != dataOutputStream) {
+      try {
+        dataOutputStream.close();
+        status = true;
+      } catch (IOException e) {
+        status = false;
+      } finally {
+        CarbonFile carbonFile =
+            FileFactory.getCarbonFile(location, FileFactory.getFileType(location));
+        if (carbonFile.exists()) {
+          if (carbonFile.delete()) {
+            LOGGER.info("Deleted the lock file " + location);
+          } else {
+            LOGGER.error("Not able to delete the lock file " + location);
+            status = false;
+          }
+        } else {
+          LOGGER.error(
+              "Not able to delete the lock file because it is not existed in location " + location);
+          status = false;
         }
+      }
     }
+    return status;
+  }
 
-    /* (non-Javadoc)
-     * @see org.apache.carbondata.core.locks.ICarbonLock#unlock()
-     */
-    @Override
-    public boolean unlock() {
-        // long startTime=System.currentTimeMillis();
-        boolean status = false;
-        if (null != dataOutputStream) {
-            try {
-                dataOutputStream.close();
-                status = true;
-            } catch (IOException e) {
-                status = false;
-            } finally {
-                CarbonFile carbonFile =
-                        FileFactory.getCarbonFile(location, FileFactory.getFileType(location));
-                if (carbonFile.exists()) {
-                    if (carbonFile.delete()) {
-                        LOGGER.info("Deleted the lock file " + location);
-                    } else {
-                        LOGGER.error("Not able to delete the lock file " + location);
-                        status = false;
-                    }
-                } else {
-                    LOGGER.error("Not able to delete the lock file because "
-                            + "it is not existed in location " + location);
-                    status = false;
-                }
-            }
-        }
-        //  long lastTime=System.currentTimeMillis();
-        //  System.out.print("\n-------------lock Total time+"+ (lastTime-startTime)+"\n");
-
-        return status;
+  /* (non-Javadoc)
+   * @see org.apache.carbondata.core.locks.ICarbonLock#lock()
+   */
+  @Override public boolean lock() {
+    try {
+      if (!FileFactory.isFileExist(location, FileFactory.getFileType(location))) {
+        FileFactory.createNewLockFile(location, FileFactory.getFileType(location));
+      }
+      dataOutputStream =
+          FileFactory.getDataOutputStreamUsingAppend(location, FileFactory.getFileType(location));
+      return true;
+    } catch (IOException e) {
+      LOGGER.error(e, e.getMessage());
+      return false;
     }
+  }
 
 }

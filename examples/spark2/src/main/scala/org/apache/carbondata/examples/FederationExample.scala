@@ -32,12 +32,10 @@ object FederationExample {
       .addProperty("carbon.blockletgroup.size.in.mb", "32")
       .addProperty(CarbonCommonConstants.CARBON_TIMESTAMP_FORMAT, "yyyy/MM/dd HH:mm:ss")
       .addProperty(CarbonCommonConstants.CARBON_DATE_FORMAT, "yyyy/MM/dd")
-      .addProperty(CarbonCommonConstants.S3_ACCESS_KEY, "********")
-      .addProperty(CarbonCommonConstants.S3_SECRET_KEY, "********")
+      .addProperty(CarbonCommonConstants.S3_ACCESS_KEY, "***********")
+      .addProperty(CarbonCommonConstants.S3_SECRET_KEY, "***********")
       .addProperty(CarbonCommonConstants.S3_IMPLEMENTATION, "org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem")
 
-    val hdfsDb = "hdfsdatabase"
-    val hdfsTable = "hdfstable"
     val s3Db = "s3Db"
     val s3Table = "s3table"
     val localDb = "localdatabase"
@@ -53,7 +51,7 @@ object FederationExample {
     spark.sql(s"CREATE DATABASE if not exists $s3Db LOCATION 's3a://<bucket-name>/$s3Db'")
     spark.sql(
       s"""
-         | CREATE TABLE $s3Db.$s3Table(
+         | CREATE TABLE if not exists $s3Db.$s3Table(
          | shortField SHORT,
          | intField INT,
          | bigintField LONG,
@@ -88,10 +86,10 @@ object FederationExample {
     spark.sql(s"Drop table if exists $s3Db.$s3Table")
     spark.sql(s"Drop database if exists $s3Db")
 
-    spark.sql(s"CREATE DATABASE $localDb")
+    spark.sql(s"CREATE DATABASE if not exists $localDb")
     spark.sql(
       s"""
-         | CREATE TABLE $localDb.$localTable(
+         | CREATE TABLE if not exists $localDb.$localTable(
          | shortField SHORT,
          | intField INT,
          | bigintField LONG,

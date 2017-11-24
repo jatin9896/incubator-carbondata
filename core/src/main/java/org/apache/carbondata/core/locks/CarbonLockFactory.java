@@ -32,7 +32,8 @@ public class CarbonLockFactory {
   /**
    * Attribute for LOGGER
    */
-  private static final LogService LOGGER = LogServiceFactory.getLogService(CarbonLockFactory.class.getName());
+  private static final LogService LOGGER =
+      LogServiceFactory.getLogService(CarbonLockFactory.class.getName());
   /**
    * lockTypeConfigured to check if zookeeper feature is enabled or not for carbon.
    */
@@ -52,14 +53,13 @@ public class CarbonLockFactory {
   public static ICarbonLock getCarbonLockObj(AbsoluteTableIdentifier absoluteTableIdentifier,
       String lockFile) {
 
-    if(lockTypeConfigured.equals(CarbonCommonConstants.CARBON_LOCK_TYPE_ZOOKEEPER)){
-      return new ZooKeeperLocking(absoluteTableIdentifier, lockFile);
-    }
     String tablePath = absoluteTableIdentifier.getTablePath();
-    if(tablePath.startsWith(CarbonCommonConstants.S3URL_PREFIX)) {
+    if (lockTypeConfigured.equals(CarbonCommonConstants.CARBON_LOCK_TYPE_ZOOKEEPER)) {
+      return new ZooKeeperLocking(absoluteTableIdentifier, lockFile);
+    } else if (tablePath.startsWith(CarbonCommonConstants.S3URL_PREFIX)) {
       lockTypeConfigured = CarbonCommonConstants.CARBON_LOCK_TYPE_S3;
       return new S3FileLock(absoluteTableIdentifier, lockFile);
-    } else if(tablePath.startsWith(CarbonCommonConstants.HDFSURL_PREFIX)) {
+    } else if (tablePath.startsWith(CarbonCommonConstants.HDFSURL_PREFIX)) {
       lockTypeConfigured = CarbonCommonConstants.CARBON_LOCK_TYPE_HDFS;
       return new HdfsFileLock(absoluteTableIdentifier, lockFile);
     } else {
@@ -69,7 +69,6 @@ public class CarbonLockFactory {
   }
 
   /**
-   *
    * @param locFileLocation
    * @param lockFile
    * @return carbon lock
