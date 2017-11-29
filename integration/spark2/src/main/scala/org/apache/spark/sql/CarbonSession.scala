@@ -21,6 +21,8 @@ import java.io.File
 import scala.collection.JavaConverters._
 
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.s3a.Constants.ACCESS_KEY
+import org.apache.hadoop.fs.s3a.Constants.SECRET_KEY
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.scheduler.{SparkListener, SparkListenerApplicationEnd}
 import org.apache.spark.sql.SparkSession.Builder
@@ -120,10 +122,11 @@ object CarbonSession {
       }
 
       val carbonProperties = CarbonProperties.getInstance()
-      if(carbonProperties.getProperty(CarbonCommonConstants.S3_ACCESS_KEY) != ""){
-        options ++= Map[String, String]((CarbonCommonConstants.S3_ACCESS_KEY, carbonProperties.getProperty(CarbonCommonConstants.S3_ACCESS_KEY))
-          ,(CarbonCommonConstants.S3_SECRET_KEY, carbonProperties.getProperty(CarbonCommonConstants.S3_SECRET_KEY)),
-        (CarbonCommonConstants.S3_IMPLEMENTATION, carbonProperties.getProperty(CarbonCommonConstants.S3_IMPLEMENTATION)))
+      if (Option(carbonProperties.getProperty(ACCESS_KEY)).isDefined) {
+        options ++= Map[String, String]((ACCESS_KEY, carbonProperties.getProperty(ACCESS_KEY))
+          , (SECRET_KEY, carbonProperties.getProperty(SECRET_KEY)),
+          (CarbonCommonConstants.S3_IMPLEMENTATION, carbonProperties
+            .getProperty(CarbonCommonConstants.S3_IMPLEMENTATION)))
       }
 
       // Get the session from current thread's active session.

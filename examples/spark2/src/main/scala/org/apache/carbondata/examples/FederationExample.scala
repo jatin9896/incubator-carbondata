@@ -19,6 +19,8 @@ package org.apache.carbondata.examples
 
 import java.io.File
 
+import org.apache.hadoop.fs.s3a.Constants.{ACCESS_KEY, SECRET_KEY}
+
 import org.apache.carbondata.core.constants.CarbonCommonConstants
 import org.apache.carbondata.core.util.CarbonProperties
 
@@ -32,9 +34,10 @@ object FederationExample {
       .addProperty("carbon.blockletgroup.size.in.mb", "32")
       .addProperty(CarbonCommonConstants.CARBON_TIMESTAMP_FORMAT, "yyyy/MM/dd HH:mm:ss")
       .addProperty(CarbonCommonConstants.CARBON_DATE_FORMAT, "yyyy/MM/dd")
-      .addProperty(CarbonCommonConstants.S3_ACCESS_KEY, "***********")
-      .addProperty(CarbonCommonConstants.S3_SECRET_KEY, "***********")
-      .addProperty(CarbonCommonConstants.S3_IMPLEMENTATION, "org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem")
+      .addProperty(ACCESS_KEY, "***********")
+      .addProperty(SECRET_KEY, "***********")
+      .addProperty(CarbonCommonConstants.S3_IMPLEMENTATION,
+        "org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem")
 
     val s3Db = "s3Db"
     val s3Table = "s3table"
@@ -45,7 +48,7 @@ object FederationExample {
     spark.sparkContext.setLogLevel("WARN")
 
     val rootPath = new File(this.getClass.getResource("/").getPath
-      + "../../../..").getCanonicalPath
+                            + "../../../..").getCanonicalPath
     val path = s"$rootPath/examples/spark2/src/main/resources/data.csv"
 
     spark.sql(s"CREATE DATABASE if not exists $s3Db LOCATION 's3a://<bucket-name>/$s3Db'")

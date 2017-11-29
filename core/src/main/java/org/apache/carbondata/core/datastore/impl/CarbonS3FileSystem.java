@@ -28,27 +28,19 @@ import static java.nio.file.Files.createTempFile;
 import static java.util.Objects.requireNonNull;
 
 import org.apache.carbondata.core.util.CarbonProperties;
-
 import static org.apache.carbondata.core.constants.CarbonCommonConstants.PATH_SEPARATOR;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_ACCESS_KEY;
-import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_SECRET_KEY;
 import static org.apache.carbondata.core.constants.CarbonCommonConstants.S3_STAGING_DIRECTORY;
 
-
 import org.apache.hadoop.conf.Configuration;
-
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-
 import org.apache.hadoop.util.Progressable;
 
 import static org.apache.hadoop.fs.s3a.Constants.ACCESS_KEY;
-import static org.apache.hadoop.fs.s3a.Constants.FAST_UPLOAD;
 import static org.apache.hadoop.fs.s3a.Constants.MIN_MULTIPART_THRESHOLD;
 import static org.apache.hadoop.fs.s3a.Constants.MULTIPART_SIZE;
-import static org.apache.hadoop.fs.s3a.Constants.PURGE_EXISTING_MULTIPART;
 import static org.apache.hadoop.fs.s3a.Constants.SECRET_KEY;
 
 public class CarbonS3FileSystem extends S3AFileSystem {
@@ -64,15 +56,13 @@ public class CarbonS3FileSystem extends S3AFileSystem {
     new Path(PATH_SEPARATOR).makeQualified(this.uri, new Path(PATH_SEPARATOR));
 
     CarbonProperties defaults = CarbonProperties.getInstance();
-    if (defaults.getProperty(S3_ACCESS_KEY) != null) {
-      conf.set(ACCESS_KEY, defaults.getProperty(S3_ACCESS_KEY));
-      conf.set(SECRET_KEY, defaults.getProperty(S3_SECRET_KEY));
+    if (defaults.getProperty(ACCESS_KEY) != null) {
+      conf.set(ACCESS_KEY, defaults.getProperty(ACCESS_KEY));
+      conf.set(SECRET_KEY, defaults.getProperty(SECRET_KEY));
     }
     this.stagingDirectory = new File(conf.get(S3_STAGING_DIRECTORY, "/tmp"));
     conf.set(MULTIPART_SIZE, "320000000");
     conf.set(MIN_MULTIPART_THRESHOLD, "320000000");
-    conf.set(FAST_UPLOAD, "true");
-    conf.set(PURGE_EXISTING_MULTIPART, "true");
     super.initialize(uri, conf);
   }
 
@@ -97,7 +87,6 @@ public class CarbonS3FileSystem extends S3AFileSystem {
       int totalSize = 0;
       int bytesRead;
       while ((bytesRead = stream.read(content)) != -1) {
-        System.out.println(String.format("%d bytes read from stream", bytesRead));
         outputStream.write(content, 0, bytesRead);
         totalSize += bytesRead;
       }

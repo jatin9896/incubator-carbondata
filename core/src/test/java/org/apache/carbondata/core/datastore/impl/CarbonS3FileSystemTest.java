@@ -15,6 +15,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 
 import static org.apache.carbondata.core.constants.CarbonCommonConstants.*;
+import static org.apache.hadoop.fs.s3a.Constants.ACCESS_KEY;
+import static org.apache.hadoop.fs.s3a.Constants.SECRET_KEY;
 
 public class CarbonS3FileSystemTest {
 
@@ -46,8 +48,8 @@ public class CarbonS3FileSystemTest {
         };
 
         try {
-            CarbonProperties.getInstance().addProperty(S3_ACCESS_KEY, "access-key")
-                    .addProperty(S3_SECRET_KEY, "secret-key")
+            CarbonProperties.getInstance().addProperty(ACCESS_KEY, "access-key")
+                    .addProperty(SECRET_KEY, "secret-key")
                     .addProperty(S3_IMPLEMENTATION, "org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem");
             URI uri = new URI("/uri");
             Configuration conf = new Configuration();

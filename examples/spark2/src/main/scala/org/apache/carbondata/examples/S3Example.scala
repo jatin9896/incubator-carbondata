@@ -19,6 +19,8 @@ package org.apache.carbondata.examples
 
 import java.io.File
 
+import org.apache.hadoop.fs.s3a.Constants.{ACCESS_KEY, SECRET_KEY}
+
 import org.apache.carbondata.core.constants.CarbonCommonConstants
 import org.apache.carbondata.core.util.CarbonProperties
 
@@ -32,13 +34,15 @@ object S3Example {
       .addProperty("carbon.blockletgroup.size.in.mb", "32")
       .addProperty(CarbonCommonConstants.CARBON_TIMESTAMP_FORMAT, "yyyy/MM/dd HH:mm:ss")
       .addProperty(CarbonCommonConstants.CARBON_DATE_FORMAT, "yyyy/MM/dd")
-      .addProperty(CarbonCommonConstants.S3_ACCESS_KEY, "***********")
-      .addProperty(CarbonCommonConstants.S3_SECRET_KEY, "***********")
-      .addProperty(CarbonCommonConstants.S3_IMPLEMENTATION, "org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem")
+      .addProperty(ACCESS_KEY, "***********")
+      .addProperty(SECRET_KEY, "***********")
+      .addProperty(CarbonCommonConstants.S3_IMPLEMENTATION,
+        "org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem")
 
 
     val spark = ExampleUtils.createCarbonSession("CarbonSessionExample")
-    spark.sparkContext.hadoopConfiguration.set("fs.s3a.impl", "org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem")
+    spark.sparkContext.hadoopConfiguration.set("fs.s3a.impl",
+      "org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem")
     spark.sparkContext.setLogLevel("WARN")
 
     val rootPath = new File(this.getClass.getResource("/").getPath + "../../../..").getCanonicalPath
