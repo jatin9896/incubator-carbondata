@@ -63,7 +63,7 @@ public class ExtendedBlocklet extends Blocklet {
     FileSystem fs;
     RemoteIterator<LocatedFileStatus> iter;
 
-    if (path.toString().startsWith(CarbonCommonConstants.S3URL_PREFIX)) {
+    if (path.toString().startsWith(CarbonCommonConstants.S3A_PREFIX)) {
       fs = new CarbonS3FileSystem();
       fs.initialize(path.toUri(), FileFactory.getConfiguration());
       iter = fs.listLocatedStatus(path.getParent());

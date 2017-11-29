@@ -17,9 +17,11 @@
 
 package org.apache.carbondata.core.datastore.filesystem;
 
+import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,14 +32,28 @@ import org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem;
 import org.apache.carbondata.core.datastore.impl.FileFactory;
 import org.apache.carbondata.core.util.CarbonUtil;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.io.compress.BZip2Codec;
+import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.CompressionCodecFactory;
+import org.apache.hadoop.io.compress.GzipCodec;
 
 public class S3CarbonFile implements CarbonFile {
 
   private static final LogService LOGGER =
       LogServiceFactory.getLogService(S3CarbonFile.class.getName());
+  private static Configuration configuration = null;
+
+  static {
+    configuration = new Configuration();
+    configuration.addResource(new Path("../core-default.xml"));
+  }
 
   protected FileStatus fileStatus;
 
@@ -49,7 +65,7 @@ public class S3CarbonFile implements CarbonFile {
     fs = new CarbonS3FileSystem();
     try {
       fs.initialize(path.toUri(), FileFactory.getConfiguration());
-      fileStatus = fs.getFileStatus(path);
+      if (fs.exists(path)) fileStatus = fs.getFileStatus(path);
     } catch (IOException e) {
       LOGGER.error("Exception occurred:" + e.getMessage());
     }
@@ -268,6 +284,159 @@ public class S3CarbonFile implements CarbonFile {
       isFileModified = true;
     }
     return isFileModified;
+  }
+
+  @Override public DataOutputStream getDataOutputStream(String path, FileFactory.FileType fileType,
+      int bufferSize, boolean append) throws IOException {
+    Path s3Path = new Path(path);
+    FileSystem s3Fs = new CarbonS3FileSystem();
+    s3Fs.initialize(s3Path.toUri(), configuration);
+    FSDataOutputStream s3Stream;
+    if (append) {
+      // append to a file only if file already exists else file not found
+      // exception will be thrown by hdfs
+      if (CarbonUtil.isFileExists(path)) {
+        s3Stream = s3Fs.append(s3Path, bufferSize);
+      } else {
+        s3Stream = s3Fs.create(s3Path, true, bufferSize);
+      }
+    } else {
+      s3Stream = s3Fs.create(s3Path, true, bufferSize);
+    }
+    return s3Stream;
+  }
+
+  @Override public DataInputStream getDataInputStream(String path, FileFactory.FileType fileType,
+      int bufferSize, Configuration configuration) throws IOException {
+    path = path.replace("\\", "/");
+    boolean gzip = path.endsWith(".gz");
+    boolean bzip2 = path.endsWith(".bz2");
+    InputStream stream;
+
+    Path s3Path = new Path(path);
+    FileSystem s3Fs = new CarbonS3FileSystem();
+    s3Fs.initialize(s3Path.toUri(), configuration);
+    if (bufferSize == -1) {
+      stream = s3Fs.open(s3Path);
+    } else {
+      stream = s3Fs.open(s3Path, bufferSize);
+    }
+    String s3CodecName = null;
+    if (gzip) {
+      s3CodecName = GzipCodec.class.getName();
+    } else if (bzip2) {
+      s3CodecName = BZip2Codec.class.getName();
+    }
+    if (null != s3CodecName) {
+      CompressionCodecFactory ccf = new CompressionCodecFactory(configuration);
+      CompressionCodec codec = ccf.getCodecByClassName(s3CodecName);
+      stream = codec.createInputStream(stream);
+    }
+
+    return new DataInputStream(new BufferedInputStream(stream));
+  }
+
+  @Override public DataInputStream getDataInputStream(String path, FileFactory.FileType fileType,
+      int bufferSize, long offset) throws IOException {
+    Path s3Path = new Path(path);
+    FileSystem s3Fs = new CarbonS3FileSystem();
+    s3Fs.initialize(s3Path.toUri(), configuration);
+    FSDataInputStream s3Stream = s3Fs.open(s3Path, bufferSize);
+    s3Stream.seek(offset);
+    return new DataInputStream(new BufferedInputStream(s3Stream));
+  }
+
+  @Override public DataOutputStream getDataOutputStream(String path, FileFactory.FileType fileType)
+      throws IOException {
+    Path s3Path = new Path(path);
+    FileSystem s3Fs = new CarbonS3FileSystem();
+    s3Fs.initialize(s3Path.toUri(), configuration);
+    return s3Fs.create(s3Path, true);
+  }
+
+  @Override public DataOutputStream getDataOutputStream(String path, FileFactory.FileType fileType,
+      int bufferSize, long blockSize) throws IOException {
+    Path s3Path = new Path(path);
+    FileSystem s3Fs = new CarbonS3FileSystem();
+    s3Fs.initialize(s3Path.toUri(), configuration);
+    return s3Fs.create(s3Path, true, bufferSize, s3Fs.getDefaultReplication(s3Path), blockSize);
+  }
+
+  @Override public boolean isFileExist(String filePath, FileFactory.FileType fileType,
+      boolean performFileCheck) throws IOException {
+    Path s3Path = new Path(filePath);
+    FileSystem s3Fs = new CarbonS3FileSystem();
+    s3Fs.initialize(s3Path.toUri(), configuration);
+    if (performFileCheck) {
+      return s3Fs.exists(s3Path) && s3Fs.isFile(s3Path);
+    } else {
+      return s3Fs.exists(s3Path);
+    }
+  }
+
+  @Override public boolean isFileExist(String filePath, FileFactory.FileType fileType)
+      throws IOException {
+    Path s3Path = new Path(filePath);
+    FileSystem s3Fs = new CarbonS3FileSystem();
+    s3Fs.initialize(s3Path.toUri(), configuration);
+    return s3Fs.exists(s3Path);
+  }
+
+  @Override public boolean createNewFile(String filePath, FileFactory.FileType fileType)
+      throws IOException {
+    Path s3Path = new Path(filePath);
+    FileSystem s3Fs = new CarbonS3FileSystem();
+    s3Fs.initialize(s3Path.toUri(), configuration);
+    return s3Fs.createNewFile(s3Path);
+  }
+
+  @Override
+  public boolean createNewFile(String filePath, FileFactory.FileType fileType, boolean doAs,
+      FsPermission permission) throws IOException {
+    return false;
+  }
+
+  @Override public boolean deleteFile(String filePath, FileFactory.FileType fileType)
+      throws IOException {
+    Path s3Path = new Path(filePath);
+    FileSystem s3Fs = new CarbonS3FileSystem();
+    s3Fs.initialize(s3Path.toUri(), configuration);
+    return s3Fs.delete(s3Path, true);
+  }
+
+  @Override public boolean mkdirs(String filePath, FileFactory.FileType fileType)
+      throws IOException {
+    Path s3Path = new Path(filePath);
+    FileSystem s3Fs = new CarbonS3FileSystem();
+    s3Fs.initialize(s3Path.toUri(), configuration);
+    return s3Fs.mkdirs(s3Path);
+  }
+
+  @Override
+  public DataOutputStream getDataOutputStreamUsingAppend(String path, FileFactory.FileType fileType)
+      throws IOException {
+    Path s3Path = new Path(path);
+    FileSystem s3Fs = new CarbonS3FileSystem();
+    s3Fs.initialize(s3Path.toUri(), configuration);
+    return s3Fs.append(s3Path);
+  }
+
+  @Override public boolean createNewLockFile(String filePath, FileFactory.FileType fileType)
+      throws IOException {
+    Path s3Path = new Path(filePath);
+    FileSystem s3Fs = new CarbonS3FileSystem();
+    s3Fs.initialize(s3Path.toUri(), configuration);
+    if (s3Fs.createNewFile(s3Path)) {
+      s3Fs.deleteOnExit(s3Path);
+      return true;
+    }
+    return false;
+  }
+
+  @Override
+  public void setPermission(String directoryPath, FsPermission permission, String username,
+      String group) throws IOException {
+
   }
 
   @Override public long getLastModifiedTime() {

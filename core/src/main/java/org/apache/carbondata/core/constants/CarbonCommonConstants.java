@@ -167,12 +167,6 @@ public final class CarbonCommonConstants {
 
   public static final String S3A_PREFIX = "s3a://";
 
-
-  /**
-   * VIEWS3URL_PREFIX
-   */
-  public static final String S3URL_PREFIX = "s3a://";
-
   /**
    * FS_DEFAULT_FS
    */
@@ -1435,28 +1429,9 @@ public final class CarbonCommonConstants {
    * S3 Constants
    */
 
-  public static final String S3_ACCESS_KEY = "fs.s3a.access.key";
-
-  public static final String S3_SECRET_KEY = "fs.s3a.secret.key";
-
   public static final String S3_IMPLEMENTATION = "fs.s3a.impl";
 
-  public static final String S3_SSL_ENABLED = "carbon.s3.ssl.enabled";
-
-  public static final String S3_MAX_ERROR_RETRIES = "carbon.s3.max-error-retries";
-
-  public static final String S3_MAX_CLIENT_RETRIES = "carbon.s3.max-client-retries";
-
-  public static final String S3_MAX_CONNECTIONS = "carbon.s3.max-connections";
-
   public static final String S3_STAGING_DIRECTORY = "carbon.s3.staging-directory";
-
-  public static final String S3_USE_INSTANCE_CREDENTIALS = "carbon.s3.use-instance-credentials";
-
-  public static final String S3_PIN_CLIENT_TO_CURRENT_REGION =
-          "carbon.s3.pin-client-to-current-region";
-
-  public static final String S3_SSE_ENABLED = "carbon.s3.sse.enabled";
 
   public static final String PATH_SEPARATOR = "/";
 

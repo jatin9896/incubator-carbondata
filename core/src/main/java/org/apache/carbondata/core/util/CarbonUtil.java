@@ -766,7 +766,7 @@ public final class CarbonUtil {
         .startsWith(CarbonCommonConstants.VIEWFSURL_PREFIX) || lowerPath
         .startsWith(CarbonCommonConstants.LOCAL_FILE_PREFIX) || lowerPath
         .startsWith(CarbonCommonConstants.ALLUXIOURL_PREFIX) || lowerPath
-        .startsWith(CarbonCommonConstants.S3URL_PREFIX);
+        .startsWith(CarbonCommonConstants.S3A_PREFIX);
   }
 
   public static String removeAKSK(String filePath) {

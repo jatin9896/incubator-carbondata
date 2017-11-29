@@ -31,8 +31,9 @@ public class DefaultFileTypeProvider implements FileTypeInerface {
       case HDFS:
       case ALLUXIO:
       case VIEWFS:
-      case S3:
         return new DFSFileHolderImpl();
+      case S3:
+        return new S3FileHolderImpl();
       default:
         return new FileHolderImpl();
     }
@@ -43,8 +44,9 @@ public class DefaultFileTypeProvider implements FileTypeInerface {
       case LOCAL:
         return new LocalCarbonFile(FileFactory.getUpdatedFilePath(path, fileType));
       case HDFS:
-      case S3:
         return new HDFSCarbonFile(path);
+      case S3:
+        return new S3CarbonFile(path);
       case ALLUXIO:
         return new AlluxioCarbonFile(path);
       case VIEWFS:
