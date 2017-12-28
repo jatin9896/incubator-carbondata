@@ -55,7 +55,7 @@ public class S3FileLockTest {
   CarbonTableIdentifier carbonTableIdentifier =
       new CarbonTableIdentifier("dbName", "tableName", "tableId");
   AbsoluteTableIdentifier absoluteTableIdentifier =
-      new AbsoluteTableIdentifier("tableName", carbonTableIdentifier);
+       AbsoluteTableIdentifier.from("tableName", carbonTableIdentifier);
   private File f = new File("lockFile");
 
   private FSDataOutputStream getOutputStream() throws IOException {

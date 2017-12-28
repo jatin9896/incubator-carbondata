@@ -386,6 +386,9 @@ public final class FileFactory {
       case HDFS:
       case ALLUXIO:
       case VIEWFS:
+        Path path = new Path(filePath);
+        FileSystem fs = path.getFileSystem(configuration);
+        return fs.getContentSummary(path).getLength();
       case S3:
         Path s3Path = new Path(filePath);
         FileSystem s3Fs = new CarbonS3FileSystem();
