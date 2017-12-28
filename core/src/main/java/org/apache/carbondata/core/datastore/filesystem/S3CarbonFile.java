@@ -51,7 +51,7 @@ public class S3CarbonFile implements CarbonFile {
   private static Configuration configuration = null;
 
   static {
-    configuration = new Configuration();
+    configuration = FileFactory.getConfiguration();
     configuration.addResource(new Path("../core-default.xml"));
   }
 

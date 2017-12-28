@@ -20,6 +20,7 @@ package org.apache.carbondata.examples
 import java.io.File
 
 import org.apache.hadoop.fs.s3a.Constants.{ACCESS_KEY, SECRET_KEY}
+import org.apache.spark.sql.SparkSession
 
 import org.apache.carbondata.core.constants.CarbonCommonConstants
 import org.apache.carbondata.core.util.CarbonProperties
@@ -28,27 +29,35 @@ object S3Example {
 
   def main(args: Array[String]) {
 
-    CarbonProperties.getInstance()
-      .addProperty("carbon.enable.vector.reader", "true")
-      .addProperty("enable.unsafe.sort", "true")
-      .addProperty("carbon.blockletgroup.size.in.mb", "32")
-      .addProperty(CarbonCommonConstants.CARBON_TIMESTAMP_FORMAT, "yyyy/MM/dd HH:mm:ss")
-      .addProperty(CarbonCommonConstants.CARBON_DATE_FORMAT, "yyyy/MM/dd")
-      .addProperty(ACCESS_KEY, "***********")
-      .addProperty(SECRET_KEY, "***********")
-      .addProperty(CarbonCommonConstants.S3_IMPLEMENTATION,
-        "org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem")
 
-
-    val spark = ExampleUtils.createCarbonSession("CarbonSessionExample")
-    spark.sparkContext.hadoopConfiguration.set("fs.s3a.impl",
-      "org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem")
-    spark.sparkContext.setLogLevel("WARN")
-
-    val rootPath = new File(this.getClass.getResource("/").getPath + "../../../..").getCanonicalPath
+    val rootPath = new File(this.getClass.getResource("/").getPath
+                            + "../../../..").getCanonicalPath
+    val storeLocation = s"$rootPath/examples/spark2/target/store"
+    val warehouse = s"$rootPath/examples/spark2/target/warehouse"
+    val metastoredb = s"$rootPath/examples/spark2/target"
     val path = s"$rootPath/examples/spark2/src/main/resources/data.csv"
 
-    spark.sql("CREATE DATABASE s3carbondemo LOCATION 's3a://<bucket-name>/s3carbondemo'")
+
+    CarbonProperties.getInstance()
+      .addProperty(CarbonCommonConstants.CARBON_TIMESTAMP_FORMAT, "yyyy/MM/dd HH:mm:ss")
+      .addProperty(CarbonCommonConstants.CARBON_DATE_FORMAT, "yyyy/MM/dd")
+      .addProperty(CarbonCommonConstants.ENABLE_UNSAFE_COLUMN_PAGE_LOADING, "true")
+
+    import org.apache.spark.sql.CarbonSession._
+    val spark = SparkSession
+      .builder()
+      .master("local")
+      .appName("CarbonSessionExample")
+      .config("spark.sql.warehouse.dir", warehouse)
+      .config("spark.driver.host", "localhost")
+      .config(ACCESS_KEY, "*********")
+      .config(SECRET_KEY, "*********")
+      .config(CarbonCommonConstants.S3_IMPLEMENTATION,
+        "org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem")
+      .getOrCreateCarbonSession(storeLocation, warehouse)
+
+    spark.sparkContext.setLogLevel("INFO")
+    spark.sql("CREATE DATABASE if not exists s3carbondemo LOCATION 's3a://<s3-bucket>/<dbname>'")
 
     spark.sql(
       s"""

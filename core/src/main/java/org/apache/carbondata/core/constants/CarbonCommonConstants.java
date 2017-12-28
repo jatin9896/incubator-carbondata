@@ -1401,7 +1401,7 @@ public final class CarbonCommonConstants {
    */
   @CarbonProperty
   public static final String CARBON_UPDATE_SEGMENT_PARALLELISM =
-          "carbon.update.segment.parallelism";
+      "carbon.update.segment.parallelism";
 
   /**
    * In default we will not optimize the update

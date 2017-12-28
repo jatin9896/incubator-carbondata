@@ -35,6 +35,7 @@ import org.apache.spark.util.{CarbonReflectionUtils, Utils}
 
 import org.apache.carbondata.common.logging.LogServiceFactory
 import org.apache.carbondata.core.constants.CarbonCommonConstants
+import org.apache.carbondata.core.datastore.impl.FileFactory
 import org.apache.carbondata.core.util.{CarbonProperties, CarbonSessionInfo, ThreadLocalSessionInfo}
 import org.apache.carbondata.events._
 import org.apache.carbondata.spark.util.CommonUtil
@@ -121,14 +122,6 @@ object CarbonSession {
         }
       }
 
-      val carbonProperties = CarbonProperties.getInstance()
-      if (Option(carbonProperties.getProperty(ACCESS_KEY)).isDefined) {
-        options ++= Map[String, String]((ACCESS_KEY, carbonProperties.getProperty(ACCESS_KEY))
-          , (SECRET_KEY, carbonProperties.getProperty(SECRET_KEY)),
-          (CarbonCommonConstants.S3_IMPLEMENTATION, carbonProperties
-            .getProperty(CarbonCommonConstants.S3_IMPLEMENTATION)))
-      }
-
       // Get the session from current thread's active session.
       var session: SparkSession = SparkSession.getActiveSession match {
         case Some(sparkSession: CarbonSession) =>
@@ -171,6 +164,11 @@ object CarbonSession {
             sparkConf.setAppName(randomAppName)
           }
           val sc = SparkContext.getOrCreate(sparkConf)
+          FileFactory.getConfiguration.set(ACCESS_KEY, sc.conf.get(ACCESS_KEY, ""))
+          FileFactory.getConfiguration.set(SECRET_KEY, sc.conf.get(SECRET_KEY, ""))
+          FileFactory.getConfiguration.set(CarbonCommonConstants.S3_IMPLEMENTATION,
+            sc.conf.get(CarbonCommonConstants.S3_IMPLEMENTATION, ""))
+
           // maybe this is an existing SparkContext, update its SparkConf which maybe used
           // by SparkSession
           options.foreach { case (k, v) => sc.conf.set(k, v) }
