@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.carbondata.core.locks;
 
 import java.io.DataOutputStream;
@@ -24,7 +25,7 @@ import java.net.URI;
 
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
 import org.apache.carbondata.core.datastore.filesystem.CarbonFile;
-import org.apache.carbondata.core.datastore.filesystem.S3CarbonFile;
+import org.apache.carbondata.core.datastore.filesystem.HDFSCarbonFile;
 import org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem;
 import org.apache.carbondata.core.datastore.impl.FileFactory;
 import org.apache.carbondata.core.metadata.AbsoluteTableIdentifier;
@@ -174,7 +175,7 @@ public class S3FileLockTest {
       }
 
       @Mock public CarbonFile getCarbonFile(String path, FileFactory.FileType fileType) {
-        return new S3CarbonFile("/tmp");
+        return new HDFSCarbonFile("/tmp");
       }
     };
 
@@ -200,7 +201,7 @@ public class S3FileLockTest {
       }
     };
 
-    new MockUp<S3CarbonFile>() {
+    new MockUp<HDFSCarbonFile>() {
       @Mock public boolean delete() {
         return true;
       }
@@ -260,7 +261,7 @@ public class S3FileLockTest {
       }
     };
 
-    new MockUp<S3CarbonFile>() {
+    new MockUp<HDFSCarbonFile>() {
       @Mock public boolean delete() {
         return false;
       }
@@ -318,7 +319,7 @@ public class S3FileLockTest {
       }
     };
 
-    new MockUp<S3CarbonFile>() {
+    new MockUp<HDFSCarbonFile>() {
       @Mock public boolean delete() {
         return false;
       }
@@ -372,7 +373,7 @@ public class S3FileLockTest {
       }
     };
 
-    new MockUp<S3CarbonFile>() {
+    new MockUp<HDFSCarbonFile>() {
       @Mock public boolean delete() {
         return false;
       }
@@ -392,3 +393,4 @@ public class S3FileLockTest {
   }
 
 }
+

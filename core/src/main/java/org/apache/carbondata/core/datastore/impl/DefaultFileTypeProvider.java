@@ -44,9 +44,8 @@ public class DefaultFileTypeProvider implements FileTypeInerface {
       case LOCAL:
         return new LocalCarbonFile(FileFactory.getUpdatedFilePath(path, fileType));
       case HDFS:
-        return new HDFSCarbonFile(path);
       case S3:
-        return new S3CarbonFile(path);
+        return new HDFSCarbonFile(path);
       case ALLUXIO:
         return new AlluxioCarbonFile(path);
       case VIEWFS:
