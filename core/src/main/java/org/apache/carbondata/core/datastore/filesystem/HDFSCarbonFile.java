@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.apache.carbondata.common.logging.LogService;
 import org.apache.carbondata.common.logging.LogServiceFactory;
+import org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem;
 import org.apache.carbondata.core.datastore.impl.FileFactory;
 
 import org.apache.hadoop.conf.Configuration;
@@ -120,6 +121,15 @@ public class HDFSCarbonFile extends AbstractDFSCarbonFile {
     FileSystem fs;
     try {
       fs = fileStatus.getPath().getFileSystem(hadoopConf);
+      if (fs instanceof CarbonS3FileSystem) {
+        try {
+          fs.rename(fileStatus.getPath(), new Path(changetoName));
+          return true;
+        } catch (IOException e) {
+          LOGGER.error("Exception occured: " + e.getMessage());
+          return false;
+        }
+      }
       if (fs instanceof DistributedFileSystem) {
         ((DistributedFileSystem) fs).rename(fileStatus.getPath(), new Path(changetoName),
             org.apache.hadoop.fs.Options.Rename.OVERWRITE);
