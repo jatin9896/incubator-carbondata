@@ -31,9 +31,8 @@ public class DefaultFileTypeProvider implements FileTypeInerface {
       case HDFS:
       case ALLUXIO:
       case VIEWFS:
-        return new DFSFileHolderImpl();
       case S3:
-        return new S3FileHolderImpl();
+        return new DFSFileHolderImpl();
       default:
         return new FileHolderImpl();
     }

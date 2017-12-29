@@ -19,7 +19,6 @@ package org.apache.carbondata.core.indexstore;
 import java.io.IOException;
 
 import org.apache.carbondata.core.constants.CarbonCommonConstants;
-import org.apache.carbondata.core.datastore.impl.CarbonS3FileSystem;
 import org.apache.carbondata.core.datastore.impl.FileFactory;
 
 import org.apache.hadoop.fs.FileSystem;
@@ -62,16 +61,8 @@ public class ExtendedBlocklet extends Blocklet {
     Path path = new Path(getPath());
     FileSystem fs;
     RemoteIterator<LocatedFileStatus> iter;
-
-    if (path.toString().startsWith(CarbonCommonConstants.S3A_PREFIX)) {
-      fs = new CarbonS3FileSystem();
-      fs.initialize(path.toUri(), FileFactory.getConfiguration());
-      iter = fs.listLocatedStatus(path.getParent());
-    } else {
-      fs = path.getFileSystem(FileFactory.getConfiguration());
-      iter = fs.listLocatedStatus(path);
-    }
-
+    fs = path.getFileSystem(FileFactory.getConfiguration());
+    iter = fs.listLocatedStatus(path);
     LocatedFileStatus fileStatus = iter.next();
     location = fileStatus.getBlockLocations()[0].getHosts();
     length = fileStatus.getLen();

@@ -21,8 +21,8 @@ import java.io.File
 import scala.collection.JavaConverters._
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.s3a.Constants.ACCESS_KEY
-import org.apache.hadoop.fs.s3a.Constants.SECRET_KEY
+import org.apache.hadoop.fs.s3a.Constants.{ACCESS_KEY, SECRET_KEY}
+
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.scheduler.{SparkListener, SparkListenerApplicationEnd}
 import org.apache.spark.sql.SparkSession.Builder
@@ -164,10 +164,8 @@ object CarbonSession {
             sparkConf.setAppName(randomAppName)
           }
           val sc = SparkContext.getOrCreate(sparkConf)
-          FileFactory.getConfiguration.set(ACCESS_KEY, sc.conf.get(ACCESS_KEY, ""))
-          FileFactory.getConfiguration.set(SECRET_KEY, sc.conf.get(SECRET_KEY, ""))
-          FileFactory.getConfiguration.set(CarbonCommonConstants.S3_IMPLEMENTATION,
-            sc.conf.get(CarbonCommonConstants.S3_IMPLEMENTATION, ""))
+          FileFactory.getConfiguration.set(ACCESS_KEY, sc.hadoopConfiguration.get(ACCESS_KEY, ""))
+          FileFactory.getConfiguration.set(SECRET_KEY, sc.hadoopConfiguration.get(SECRET_KEY, ""))
 
           // maybe this is an existing SparkContext, update its SparkConf which maybe used
           // by SparkSession

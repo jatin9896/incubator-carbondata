@@ -247,7 +247,16 @@ public final class FileFactory {
    */
   public static DataOutputStream getDataOutputStreamUsingAppend(String path, FileType fileType)
       throws IOException {
-    return getCarbonFile(path).getDataOutputStreamUsingAppend(path, fileType);
+    if(FileType.S3 == fileType) {
+      CarbonFile carbonFile = getCarbonFile(path);
+      if(carbonFile.exists()){
+        carbonFile.delete();
+      }
+      return carbonFile.getDataOutputStream(path,fileType);
+    } else {
+      return getCarbonFile(path).getDataOutputStreamUsingAppend(path, fileType);
+    }
+
   }
 
   /**
@@ -386,14 +395,10 @@ public final class FileFactory {
       case HDFS:
       case ALLUXIO:
       case VIEWFS:
+      case S3:
         Path path = new Path(filePath);
         FileSystem fs = path.getFileSystem(configuration);
         return fs.getContentSummary(path).getLength();
-      case S3:
-        Path s3Path = new Path(filePath);
-        FileSystem s3Fs = new CarbonS3FileSystem();
-        s3Fs.initialize(s3Path.toUri(), configuration);
-        return s3Fs.getContentSummary(s3Path).getLength();
       case LOCAL:
       default:
         filePath = getUpdatedFilePath(filePath, fileType);
@@ -429,19 +434,6 @@ public final class FileFactory {
     FileFactory.FileType fileType = FileFactory.getFileType(directoryPath);
     switch (fileType) {
       case S3:
-        try {
-          Path path = new Path(directoryPath);
-          FileSystem s3fs = new CarbonS3FileSystem();
-          s3fs.initialize(path.toUri(), configuration);
-          if (!s3fs.exists(path)) {
-            s3fs.mkdirs(path);
-            s3fs.setPermission(path, permission);
-          }
-        } catch (IOException e) {
-          LOGGER.error("Exception occurred : " + e.getMessage());
-          throw e;
-        }
-        return;
       case HDFS:
       case VIEWFS:
         try {
