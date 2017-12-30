@@ -1417,16 +1417,6 @@ public final class CarbonCommonConstants {
   public static final String CARBON_UPDATE_SYNC_FOLDER_DEFAULT = "/tmp/carbondata";
 
   /**
-   * S3 Constants
-   */
-
-  public static final String S3_IMPLEMENTATION = "fs.s3a.impl";
-
-  public static final String S3_STAGING_DIRECTORY = "carbon.s3.staging-directory";
-
-  public static final String PATH_SEPARATOR = "/";
-
-  /**
    * this will be used to pass bitset value in filter to another filter for
    * faster execution of filter query
    */

@@ -25,19 +25,13 @@ import org.slf4j.{Logger, LoggerFactory}
 import org.apache.carbondata.core.constants.CarbonCommonConstants
 import org.apache.carbondata.core.util.CarbonProperties
 
-object S3Example {
-
-  /**
-   * This example demonstratate usage of s3 as a store.
-   * @param args require three parameters "fs.s3a.access.key" "fs.s3a.secret.key"
-   *             "carbon store location"
-   */
+object S3CsvExample {
 
   def main(args: Array[String]) {
     val rootPath = new File(this.getClass.getResource("/").getPath
                             + "../../../..").getCanonicalPath
+    val storeLocation = s"$rootPath/examples/spark2/target/store"
     val warehouse = s"$rootPath/examples/spark2/target/warehouse"
-    val path = s"$rootPath/examples/spark2/src/main/resources/data.csv"
     val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
     CarbonProperties.getInstance()
@@ -48,7 +42,7 @@ object S3Example {
     import org.apache.spark.sql.CarbonSession._
     if (args.length != 3) {
       logger.error("Usage: java CarbonS3Example <fs.s3a.access.key> <fs.s3a.secret" +
-              ".key> <s3 bucket path>")
+              ".key> <s3.csv.location>")
       System.exit(0)
     }
 
@@ -60,12 +54,10 @@ object S3Example {
       .config("spark.driver.host", "localhost")
       .config("spark.hadoop." + ACCESS_KEY, args(0))
       .config("spark.hadoop." + SECRET_KEY, args(1))
-      .getOrCreateCarbonSession(args(2), warehouse)
+      .getOrCreateCarbonSession(storeLocation, warehouse)
 
     spark.sparkContext.setLogLevel("INFO")
 
-//    spark.sql("Drop table if exists carbon_table")
-/*
     spark.sql(
       s"""
          | CREATE TABLE if not exists carbon_table(
@@ -88,32 +80,27 @@ object S3Example {
     // scalastyle:off
     spark.sql(
       s"""
-         | LOAD DATA LOCAL INPATH '$path'
+         | LOAD DATA LOCAL INPATH '${ args(2) }'
          | INTO TABLE carbon_table
          | OPTIONS('HEADER'='true', 'COMPLEX_DELIMITER_LEVEL_1'='#')
        """.stripMargin)
 
     spark.sql(
       s"""
-         | LOAD DATA LOCAL INPATH '$path'
+         | LOAD DATA LOCAL INPATH '${ args(2) }'
          | INTO TABLE carbon_table
          | OPTIONS('HEADER'='true', 'COMPLEX_DELIMITER_LEVEL_1'='#')
        """.stripMargin)
-    // scalastyle:on*/
+    // scalastyle:on
 
-    spark.sql("update carbon_table " +
-              "set (stringfield) = ('newspark') where intfield = 10").show()
     spark.sql(
       s"""
          | SELECT *
          | FROM carbon_table
       """.stripMargin).show()
 
-//    spark.sql("Drop table if exists carbon_table")
-    /*spark.sql("update carbon_table " +
-              "set (stringfield) = ('newspark') where intfield=10")*/
+    spark.sql("Drop table if exists carbon_table")
 
     spark.stop()
   }
-
 }

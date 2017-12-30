@@ -35,11 +35,6 @@
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpclient</artifactId>
-      <version>4.5.2</version>
-    </dependency>
-    <dependency>
       <groupId>org.apache.carbondata</groupId>
       <artifactId>carbondata-format</artifactId>
       <version>${project.version}</version>
@@ -99,15 +94,6 @@
         </exclusion>
       </exclusions>
     </dependency>
-
-
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-annotations</artifactId>
-      <version>2.9.0</version>
-      <scope>test</scope>
-    </dependency>
-
   </dependencies>
 
   <build>

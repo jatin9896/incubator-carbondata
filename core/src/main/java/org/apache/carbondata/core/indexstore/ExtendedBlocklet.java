@@ -18,7 +18,6 @@ package org.apache.carbondata.core.indexstore;
 
 import java.io.IOException;
 
-import org.apache.carbondata.core.constants.CarbonCommonConstants;
 import org.apache.carbondata.core.datastore.impl.FileFactory;
 
 import org.apache.hadoop.fs.FileSystem;
