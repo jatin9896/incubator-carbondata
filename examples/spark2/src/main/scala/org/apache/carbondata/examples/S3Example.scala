@@ -48,7 +48,7 @@ object S3Example {
     import org.apache.spark.sql.CarbonSession._
     if (args.length != 3) {
       logger.error("Usage: java CarbonS3Example <fs.s3a.access.key> <fs.s3a.secret" +
-              ".key> <s3 bucket path>")
+              ".key> <carbon store location> <s3.csv.location>")
       System.exit(0)
     }
 
@@ -64,8 +64,6 @@ object S3Example {
 
     spark.sparkContext.setLogLevel("INFO")
 
-//    spark.sql("Drop table if exists carbon_table")
-/*
     spark.sql(
       s"""
          | CREATE TABLE if not exists carbon_table(
@@ -99,19 +97,15 @@ object S3Example {
          | INTO TABLE carbon_table
          | OPTIONS('HEADER'='true', 'COMPLEX_DELIMITER_LEVEL_1'='#')
        """.stripMargin)
-    // scalastyle:on*/
+    // scalastyle:on
 
-    spark.sql("update carbon_table " +
-              "set (stringfield) = ('newspark') where intfield = 10").show()
     spark.sql(
       s"""
          | SELECT *
          | FROM carbon_table
       """.stripMargin).show()
 
-//    spark.sql("Drop table if exists carbon_table")
-    /*spark.sql("update carbon_table " +
-              "set (stringfield) = ('newspark') where intfield=10")*/
+    spark.sql("Drop table if exists carbon_table")
 
     spark.stop()
   }
