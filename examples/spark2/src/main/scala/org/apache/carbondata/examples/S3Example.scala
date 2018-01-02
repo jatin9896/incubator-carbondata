@@ -28,9 +28,11 @@ import org.apache.carbondata.core.util.CarbonProperties
 object S3Example {
 
   /**
-   * This example demonstratate usage of s3 as a store.
+   * This example demonstrate usage of s3 as a store.
+   * This Example also test multiple load scenario.
+   *
    * @param args require three parameters "fs.s3a.access.key" "fs.s3a.secret.key"
-   *             "carbon store location"
+   *             "s3 bucket path"
    */
 
   def main(args: Array[String]) {
@@ -48,7 +50,7 @@ object S3Example {
     import org.apache.spark.sql.CarbonSession._
     if (args.length != 3) {
       logger.error("Usage: java CarbonS3Example <fs.s3a.access.key> <fs.s3a.secret" +
-              ".key> <carbon store location> <s3.csv.location>")
+                   ".key> <carbon store location> <s3.csv.location>")
       System.exit(0)
     }
 
@@ -83,7 +85,6 @@ object S3Example {
          | TBLPROPERTIES('SORT_COLUMNS'='', 'DICTIONARY_INCLUDE'='dateField, charField')
        """.stripMargin)
 
-    // scalastyle:off
     spark.sql(
       s"""
          | LOAD DATA LOCAL INPATH '$path'
@@ -97,7 +98,6 @@ object S3Example {
          | INTO TABLE carbon_table
          | OPTIONS('HEADER'='true', 'COMPLEX_DELIMITER_LEVEL_1'='#')
        """.stripMargin)
-    // scalastyle:on
 
     spark.sql(
       s"""

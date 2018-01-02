@@ -45,14 +45,14 @@ import org.apache.hadoop.io.compress.GzipCodec;
 import org.apache.hadoop.io.compress.Lz4Codec;
 import org.apache.hadoop.io.compress.SnappyCodec;
 
-public abstract  class AbstractDFSCarbonFile implements CarbonFile {
+public abstract class AbstractDFSCarbonFile implements CarbonFile {
   /**
    * LOGGER
    */
   private static final LogService LOGGER =
       LogServiceFactory.getLogService(AbstractDFSCarbonFile.class.getName());
-  protected FileStatus fileStatus;
   public FileSystem fs;
+  protected FileStatus fileStatus;
   protected Configuration hadoopConf;
 
   public AbstractDFSCarbonFile(String filePath) {
@@ -262,7 +262,18 @@ public abstract  class AbstractDFSCarbonFile implements CarbonFile {
       // append to a file only if file already exists else file not found
       // exception will be thrown by hdfs
       if (CarbonUtil.isFileExists(path)) {
-        stream = fs.append(pt, bufferSize);
+        if (FileFactory.FileType.S3 == fileType) {
+          DataInputStream dis = fs.open(pt);
+          int count = dis.available();
+          // create buffer
+          byte[] bs = new byte[count];
+          dis.read(bs);
+          fs.delete(pt, true);
+          stream = fs.create(pt, true, bufferSize);
+          stream.write(bs);
+        } else {
+          stream = fs.append(pt, bufferSize);
+        }
       } else {
         stream = fs.create(pt, true, bufferSize);
       }
