@@ -39,13 +39,14 @@ object S3Example {
     val rootPath = new File(this.getClass.getResource("/").getPath
                             + "../../../..").getCanonicalPath
     val warehouse = s"$rootPath/examples/spark2/target/warehouse"
-    val path = s"$rootPath/examples/spark2/src/main/resources/data.csv"
+    val path = s"$rootPath/examples/spark2/src/main/resources/data1.csv"
     val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
     CarbonProperties.getInstance()
       .addProperty(CarbonCommonConstants.CARBON_TIMESTAMP_FORMAT, "yyyy/MM/dd HH:mm:ss")
       .addProperty(CarbonCommonConstants.CARBON_DATE_FORMAT, "yyyy/MM/dd")
       .addProperty(CarbonCommonConstants.ENABLE_UNSAFE_COLUMN_PAGE_LOADING, "true")
+      .addProperty(CarbonCommonConstants.DEFAULT_CARBON_MAJOR_COMPACTION_SIZE, "0.02")
 
     import org.apache.spark.sql.CarbonSession._
     if (args.length != 3) {
@@ -78,8 +79,7 @@ object S3Example {
          | decimalField DECIMAL(18,2),
          | dateField DATE,
          | charField CHAR(5),
-         | floatField FLOAT,
-         | complexData ARRAY<STRING>
+         | floatField FLOAT
          | )
          | STORED BY 'carbondata'
          | TBLPROPERTIES('SORT_COLUMNS'='', 'DICTIONARY_INCLUDE'='dateField, charField')
@@ -89,15 +89,42 @@ object S3Example {
       s"""
          | LOAD DATA LOCAL INPATH '$path'
          | INTO TABLE carbon_table
-         | OPTIONS('HEADER'='true', 'COMPLEX_DELIMITER_LEVEL_1'='#')
+         | OPTIONS('HEADER'='true')
        """.stripMargin)
 
     spark.sql(
       s"""
          | LOAD DATA LOCAL INPATH '$path'
          | INTO TABLE carbon_table
-         | OPTIONS('HEADER'='true', 'COMPLEX_DELIMITER_LEVEL_1'='#')
+         | OPTIONS('HEADER'='true')
        """.stripMargin)
+
+    spark.sql(
+      s"""
+         | LOAD DATA LOCAL INPATH '$path'
+         | INTO TABLE carbon_table
+         | OPTIONS('HEADER'='true')
+       """.stripMargin)
+
+    spark.sql(
+      s"""
+         | LOAD DATA LOCAL INPATH '$path'
+         | INTO TABLE carbon_table
+         | OPTIONS('HEADER'='true')
+       """.stripMargin)
+
+    spark.sql("ALTER table carbon_table compact 'MINOR'")
+    spark.sql("show segments for table carbon_table").show()
+
+    spark.sql(
+      s"""
+         | LOAD DATA LOCAL INPATH '$path'
+         | INTO TABLE carbon_table
+         | OPTIONS('HEADER'='true')
+       """.stripMargin)
+
+    spark.sql("ALTER table carbon_table compact 'MAJOR'")
+    spark.sql("show segments for table carbon_table").show()
 
     spark.sql(
       s"""

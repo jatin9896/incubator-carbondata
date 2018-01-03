@@ -256,29 +256,29 @@ public abstract class AbstractDFSCarbonFile implements CarbonFile {
   @Override public DataOutputStream getDataOutputStream(String path, FileFactory.FileType fileType,
       int bufferSize, boolean append) throws IOException {
     Path pt = new Path(path);
-    FileSystem fs = pt.getFileSystem(FileFactory.getConfiguration());
+    FileSystem fileSystem = pt.getFileSystem(FileFactory.getConfiguration());
     FSDataOutputStream stream = null;
     if (append) {
       // append to a file only if file already exists else file not found
       // exception will be thrown by hdfs
       if (CarbonUtil.isFileExists(path)) {
         if (FileFactory.FileType.S3 == fileType) {
-          DataInputStream dis = fs.open(pt);
-          int count = dis.available();
+          DataInputStream dataInputStream = fileSystem.open(pt);
+          int count = dataInputStream.available();
           // create buffer
-          byte[] bs = new byte[count];
-          dis.read(bs);
-          fs.delete(pt, true);
-          stream = fs.create(pt, true, bufferSize);
-          stream.write(bs);
+          byte[] byteStreamBuffer = new byte[count];
+          dataInputStream.read(byteStreamBuffer);
+          fileSystem.delete(pt, true);
+          stream = fileSystem.create(pt, true, bufferSize);
+          stream.write(byteStreamBuffer);
         } else {
-          stream = fs.append(pt, bufferSize);
+          stream = fileSystem.append(pt, bufferSize);
         }
       } else {
-        stream = fs.create(pt, true, bufferSize);
+        stream = fileSystem.create(pt, true, bufferSize);
       }
     } else {
-      stream = fs.create(pt, true, bufferSize);
+      stream = fileSystem.create(pt, true, bufferSize);
     }
     return stream;
   }
