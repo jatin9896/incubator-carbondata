@@ -53,15 +53,12 @@ public class ExtendedBlocklet extends Blocklet {
   /**
    * It gets the hdfs block locations and length for this blocklet. It is used internally to get the
    * locations for allocating tasks.
-   *
    * @throws IOException
    */
   public void updateLocations() throws IOException {
     Path path = new Path(getPath());
-    FileSystem fs;
-    RemoteIterator<LocatedFileStatus> iter;
-    fs = path.getFileSystem(FileFactory.getConfiguration());
-    iter = fs.listLocatedStatus(path);
+    FileSystem fs = path.getFileSystem(FileFactory.getConfiguration());
+    RemoteIterator<LocatedFileStatus> iter = fs.listLocatedStatus(path);
     LocatedFileStatus fileStatus = iter.next();
     location = fileStatus.getBlockLocations()[0].getHosts();
     length = fileStatus.getLen();

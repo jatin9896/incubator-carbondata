@@ -41,7 +41,6 @@ object S3Example {
     val warehouse = s"$rootPath/examples/spark2/target/warehouse"
     val path = s"$rootPath/examples/spark2/src/main/resources/data1.csv"
     val logger: Logger = LoggerFactory.getLogger(this.getClass)
-
     CarbonProperties.getInstance()
       .addProperty(CarbonCommonConstants.CARBON_TIMESTAMP_FORMAT, "yyyy/MM/dd HH:mm:ss")
       .addProperty(CarbonCommonConstants.CARBON_DATE_FORMAT, "yyyy/MM/dd")
@@ -50,19 +49,20 @@ object S3Example {
 
     import org.apache.spark.sql.CarbonSession._
     if (args.length != 3) {
-      logger.error("Usage: java CarbonS3Example <fs.s3a.access.key> <fs.s3a.secret" +
-                   ".key> <carbon store location> <s3.csv.location>")
+      logger.error("Usage: java CarbonS3Example <access-key> <secret-key>" +
+                   "<carbon store location>")
       System.exit(0)
     }
 
+    val (accessKey, secretKey) = getKeyOnPrefix(args(2))
     val spark = SparkSession
       .builder()
       .master("local")
       .appName("CarbonSessionExample")
       .config("spark.sql.warehouse.dir", warehouse)
       .config("spark.driver.host", "localhost")
-      .config("spark.hadoop." + ACCESS_KEY, args(0))
-      .config("spark.hadoop." + SECRET_KEY, args(1))
+      .config(accessKey, args(0))
+      .config(secretKey, args(1))
       .getOrCreateCarbonSession(args(2), warehouse)
 
     spark.sparkContext.setLogLevel("INFO")
@@ -137,4 +137,17 @@ object S3Example {
     spark.stop()
   }
 
+  def getKeyOnPrefix(path: String): (String, String) = {
+    if (path.startsWith(CarbonCommonConstants.S3A_PREFIX)) {
+      ("spark.hadoop." + ACCESS_KEY, "spark.hadoop." + SECRET_KEY)
+    } else if (path.startsWith(CarbonCommonConstants.S3N_PREFIX)) {
+      ("spark.hadoop." + CarbonCommonConstants.S3N_ACCESS_KEY,
+        "spark.hadoop." + CarbonCommonConstants.S3N_SECRET_KEY)
+    } else if (path.startsWith(CarbonCommonConstants.S3_PREFIX)) {
+      ("spark.hadoop." + CarbonCommonConstants.S3_ACCESS_KEY,
+        "spark.hadoop." + CarbonCommonConstants.S3_SECRET_KEY)
+    } else {
+      throw new Exception("Incorrect Store Path")
+    }
+  }
 }

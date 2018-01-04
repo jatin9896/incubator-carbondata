@@ -779,7 +779,7 @@ public final class CarbonUtil {
   }
 
   private static boolean checkIfPrefixExists(String path) {
-    final String lowerPath = path.toLowerCase();
+    final String lowerPath = path.toLowerCase(Locale.getDefault());
     return lowerPath.startsWith(CarbonCommonConstants.HDFSURL_PREFIX) ||
         lowerPath.startsWith(CarbonCommonConstants.VIEWFSURL_PREFIX) ||
         lowerPath.startsWith(CarbonCommonConstants.LOCAL_FILE_PREFIX) ||

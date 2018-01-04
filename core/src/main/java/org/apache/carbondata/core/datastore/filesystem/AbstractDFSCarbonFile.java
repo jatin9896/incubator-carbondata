@@ -51,8 +51,8 @@ public abstract class AbstractDFSCarbonFile implements CarbonFile {
    */
   private static final LogService LOGGER =
       LogServiceFactory.getLogService(AbstractDFSCarbonFile.class.getName());
-  public FileSystem fs;
   protected FileStatus fileStatus;
+  public FileSystem fs;
   protected Configuration hadoopConf;
 
   public AbstractDFSCarbonFile(String filePath) {
@@ -268,7 +268,6 @@ public abstract class AbstractDFSCarbonFile implements CarbonFile {
           // create buffer
           byte[] byteStreamBuffer = new byte[count];
           dataInputStream.read(byteStreamBuffer);
-          fileSystem.delete(pt, true);
           stream = fileSystem.create(pt, true, bufferSize);
           stream.write(byteStreamBuffer);
         } else {

@@ -18,7 +18,6 @@ package org.apache.carbondata.examples
 
 import java.io.File
 
-import org.apache.hadoop.fs.s3a.Constants.{ACCESS_KEY, SECRET_KEY}
 import org.apache.spark.sql.SparkSession
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -41,8 +40,8 @@ object S3CsvExample {
 
     import org.apache.spark.sql.CarbonSession._
     if (args.length != 3) {
-      logger.error("Usage: java CarbonS3Example <fs.s3a.access.key> <fs.s3a.secret" +
-              ".key> <s3.csv.location>")
+      logger.error("Usage: java CarbonS3Example <access-key> <secret-key>" +
+                   "<s3.csv.location>")
       System.exit(0)
     }
 
@@ -52,8 +51,8 @@ object S3CsvExample {
       .appName("CarbonSessionExample")
       .config("spark.sql.warehouse.dir", warehouse)
       .config("spark.driver.host", "localhost")
-      .config("spark.hadoop." + ACCESS_KEY, args(0))
-      .config("spark.hadoop." + SECRET_KEY, args(1))
+      .config("spark.hadoop." + CarbonCommonConstants.S3N_ACCESS_KEY, args(0))
+      .config("spark.hadoop." + CarbonCommonConstants.S3N_SECRET_KEY, args(1))
       .getOrCreateCarbonSession(storeLocation, warehouse)
 
     spark.sparkContext.setLogLevel("INFO")

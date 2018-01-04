@@ -197,7 +197,6 @@ public final class FileFactory {
       final FsPermission permission) throws IOException {
     return getCarbonFile(filePath).createNewFile(filePath, fileType, doAs, permission);
   }
-
   public static boolean deleteFile(String filePath, FileType fileType) throws IOException {
     return getCarbonFile(filePath).deleteFile(filePath, fileType);
   }
@@ -256,7 +255,6 @@ public final class FileFactory {
     } else {
       return getCarbonFile(path).getDataOutputStreamUsingAppend(path, fileType);
     }
-
   }
 
   /**

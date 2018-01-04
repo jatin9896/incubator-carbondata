@@ -163,9 +163,7 @@ object CarbonSession {
             sparkConf.setAppName(randomAppName)
           }
           val sc = SparkContext.getOrCreate(sparkConf)
-          FileFactory.getConfiguration.set(ACCESS_KEY, sc.hadoopConfiguration.get(ACCESS_KEY, ""))
-          FileFactory.getConfiguration.set(SECRET_KEY, sc.hadoopConfiguration.get(SECRET_KEY, ""))
-
+          setS3Configurations(sc)
           // maybe this is an existing SparkContext, update its SparkConf which maybe used
           // by SparkSession
           options.foreach { case (k, v) => sc.conf.set(k, v) }
@@ -281,5 +279,20 @@ object CarbonSession {
       .addListener(classOf[LoadTablePreExecutionEvent], LoadPreAggregateTablePreListener)
       .addListener(classOf[AlterTableCompactionPreStatusUpdateEvent],
         AlterPreAggregateTableCompactionPostListener)
+  }
+
+  private def setS3Configurations(sparkContext: SparkContext): Unit = {
+    FileFactory.getConfiguration
+      .set(ACCESS_KEY, sparkContext.hadoopConfiguration.get(ACCESS_KEY, ""))
+    FileFactory.getConfiguration
+      .set(SECRET_KEY, sparkContext.hadoopConfiguration.get(SECRET_KEY, ""))
+    FileFactory.getConfiguration.set(CarbonCommonConstants.S3_ACCESS_KEY,
+      sparkContext.hadoopConfiguration.get(CarbonCommonConstants.S3_ACCESS_KEY, ""))
+    FileFactory.getConfiguration.set(CarbonCommonConstants.S3_SECRET_KEY,
+      sparkContext.hadoopConfiguration.get(CarbonCommonConstants.S3_SECRET_KEY, ""))
+    FileFactory.getConfiguration.set(CarbonCommonConstants.S3N_ACCESS_KEY,
+      sparkContext.hadoopConfiguration.get(CarbonCommonConstants.S3N_ACCESS_KEY, ""))
+    FileFactory.getConfiguration.set(CarbonCommonConstants.S3N_SECRET_KEY,
+      sparkContext.hadoopConfiguration.get(CarbonCommonConstants.S3N_SECRET_KEY, ""))
   }
 }
