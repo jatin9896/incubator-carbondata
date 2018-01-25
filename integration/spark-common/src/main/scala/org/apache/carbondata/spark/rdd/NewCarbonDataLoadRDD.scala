@@ -182,7 +182,7 @@ class NewCarbonDataLoadRDD[K, V](
     carbonLoadModel: CarbonLoadModel,
     blocksGroupBy: Array[(String, Array[BlockDetails])],
     @transient hadoopConf: Configuration)
-  extends CarbonRDD[(K, V)](sc, Nil) {
+  extends CarbonRDD[(K, V)](sc, Nil, sc.hadoopConfiguration) {
 
   sc.setLocalProperty("spark.scheduler.pool", "DDL")
 
@@ -347,31 +347,10 @@ class NewDataFrameLoaderRDD[K, V](
     sc: SparkContext,
     result: DataLoadResult[K, V],
     carbonLoadModel: CarbonLoadModel,
-    prev: DataLoadCoalescedRDD[Row],
-    @transient hadoopConf: Configuration) extends CarbonRDD[(K, V)](prev) {
-
-  private val confBytes = {
-    val bao = new ByteArrayOutputStream()
-    val oos = new ObjectOutputStream(bao)
-    hadoopConf.write(oos)
-    oos.close()
-    CompressorFactory.getInstance().getCompressor.compressByte(bao.toByteArray)
-  }
-
-  private def getConf = {
-    val configuration = new Configuration(false)
-    val bai = new ByteArrayInputStream(CompressorFactory.getInstance().getCompressor
-      .unCompressByte(confBytes))
-    val ois = new ObjectInputStream(bai)
-    configuration.readFields(ois)
-    ois.close()
-    configuration
-  }
+    prev: DataLoadCoalescedRDD[Row]) extends CarbonRDD[(K, V)](prev) {
 
   override def internalCompute(theSplit: Partition, context: TaskContext): Iterator[(K, V)] = {
     val LOGGER = LogServiceFactory.getLogService(this.getClass.getName)
-    val hadoopConf = getConf
-    setS3Configurations(hadoopConf)
     val iter = new Iterator[(K, V)] {
       val loadMetadataDetails = new LoadMetadataDetails()
       val executionErrors = new ExecutionErrors(FailureCauses.NONE, "")
@@ -441,23 +420,6 @@ class NewDataFrameLoaderRDD[K, V](
     iter
   }
   override protected def getPartitions: Array[Partition] = firstParent[Row].partitions
-
-  private def setS3Configurations(hadoopConf: Configuration): Unit = {
-    FileFactory.getConfiguration
-      .set("fs.s3a.access.key", hadoopConf.get("fs.s3a.access.key", ""))
-    FileFactory.getConfiguration
-      .set("fs.s3a.secret.key", hadoopConf.get("fs.s3a.secret.key", ""))
-    FileFactory.getConfiguration
-      .set("fs.s3a.endpoint", hadoopConf.get("fs.s3a.endpoint", ""))
-    FileFactory.getConfiguration.set(CarbonCommonConstants.S3_ACCESS_KEY,
-      hadoopConf.get(CarbonCommonConstants.S3_ACCESS_KEY, ""))
-    FileFactory.getConfiguration.set(CarbonCommonConstants.S3_SECRET_KEY,
-      hadoopConf.get(CarbonCommonConstants.S3_SECRET_KEY, ""))
-    FileFactory.getConfiguration.set(CarbonCommonConstants.S3N_ACCESS_KEY,
-      hadoopConf.get(CarbonCommonConstants.S3N_ACCESS_KEY, ""))
-    FileFactory.getConfiguration.set(CarbonCommonConstants.S3N_SECRET_KEY,
-     hadoopConf.get(CarbonCommonConstants.S3N_SECRET_KEY, ""))
-  }
 }
 
 /**

@@ -992,8 +992,7 @@ object CarbonDataRDDFactory {
         sqlContext.sparkContext,
         new DataLoadResultImpl(),
         carbonLoadModel,
-        newRdd,
-        sqlContext.sparkContext.hadoopConfiguration
+        newRdd
       ).collect()
     } catch {
       case ex: Exception =>
