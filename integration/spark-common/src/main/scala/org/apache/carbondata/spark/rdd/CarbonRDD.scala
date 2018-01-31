@@ -36,8 +36,9 @@ import org.apache.carbondata.core.util._
  * This RDD maintains session level ThreadLocal
  */
 abstract class CarbonRDD[T: ClassTag](@transient sc: SparkContext,
-    @transient private var deps: Seq[Dependency[_]]) extends RDD[T](sc, deps) {
-  @transient val hadoopConf: Configuration = sc.hadoopConfiguration
+    @transient private var deps: Seq[Dependency[_]],
+    @transient hadoopConf: Configuration) extends RDD[T](sc, deps) {
+
   val carbonSessionInfo: CarbonSessionInfo = {
     var info = ThreadLocalSessionInfo.getCarbonSessionInfo
     if (info == null || info.getSessionParams == null) {
@@ -58,7 +59,8 @@ abstract class CarbonRDD[T: ClassTag](@transient sc: SparkContext,
 
   /** Construct an RDD with just a one-to-one dependency on one parent */
   def this(@transient oneParent: RDD[_]) =
-    this (oneParent.context, List(new OneToOneDependency(oneParent)))
+    this (oneParent.context, List(new OneToOneDependency(oneParent)),
+      oneParent.sparkContext.hadoopConfiguration)
 
   // RDD compute logic should be here
   def internalCompute(split: Partition, context: TaskContext): Iterator[T]
@@ -75,7 +77,7 @@ abstract class CarbonRDD[T: ClassTag](@transient sc: SparkContext,
     internalCompute(split, context)
   }
 
-  private def getConf = {
+  private def getConf: Configuration = {
     val configuration = new Configuration(false)
     val bai = new ByteArrayInputStream(CompressorFactory.getInstance().getCompressor
       .unCompressByte(confBytes))
@@ -109,7 +111,7 @@ abstract class CarbonRDD[T: ClassTag](@transient sc: SparkContext,
 abstract class CarbonRDDWithTableInfo[T: ClassTag](
     @transient sc: SparkContext,
     @transient private var deps: Seq[Dependency[_]],
-    serializedTableInfo: Array[Byte]) extends CarbonRDD[T](sc, deps) {
+    serializedTableInfo: Array[Byte]) extends CarbonRDD[T](sc, deps, sc.hadoopConfiguration) {
 
   def this(@transient oneParent: RDD[_], serializedTableInfo: Array[Byte]) =
     this (oneParent.context, List(new OneToOneDependency(oneParent)), serializedTableInfo)
